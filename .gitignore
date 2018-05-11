@@ -1,0 +1,7 @@
+.*
+*.pyc
+__pycache__/
+data
+cache
+pretrained
+!.gitignore
