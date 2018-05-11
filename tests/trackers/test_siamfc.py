@@ -15,6 +15,7 @@ class TestTrackerSiamFC(unittest.TestCase):
         self.vot_dir = 'data/vot2017'
         self.net_v1 = 'pretrained/siamfc/2016-08-17.net.mat'
         self.net_v2 = 'pretrained/siamfc/baseline-conv5_e55.mat'
+        self.stats_path = 'pretrained/siamfc/cfnet_ILSVRC2015.stats.mat'
 
     def tearDown(self):
         pass
@@ -32,12 +33,12 @@ class TestTrackerSiamFC(unittest.TestCase):
 
     def test_siamfc_train_v1(self):
         tracker = TrackerSiamFC(branch='alexv1')
-        transform = TransformSiamFC(score_sz=17)
+        transform = TransformSiamFC(
+            score_sz=17, stats_path=self.stats_path)
 
         base_dataset = VOT(self.vot_dir, return_bndbox=True)
         dataset = Pairwise(base_dataset, transform)
-        dataloader = DataLoader(
-            dataset, batch_size=2, shuffle=True, num_workers=4)
+        dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
         # training step
         for it, batch in enumerate(dataloader):
@@ -61,12 +62,12 @@ class TestTrackerSiamFC(unittest.TestCase):
 
     def test_siamfc_train_v2(self):
         tracker = TrackerSiamFC(branch='alexv2')
-        transform = TransformSiamFC()
+        transform = TransformSiamFC(
+            score_sz=33, stats_path=self.stats_path)
 
         base_dataset = VOT(self.vot_dir, return_bndbox=True)
         dataset = Pairwise(base_dataset, transform)
-        dataloader = DataLoader(
-            dataset, batch_size=2, shuffle=True, num_workers=4)
+        dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
         # training step
         for it, batch in enumerate(dataloader):

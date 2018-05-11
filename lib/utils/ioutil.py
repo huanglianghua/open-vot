@@ -6,7 +6,10 @@ import os
 import zipfile
 import torch
 import scipy.io
+import h5py
+import numpy as np
 from urllib.request import urlretrieve
+from collections import namedtuple
 
 from ..models import AlexNetV1, AlexNetV2
 
@@ -114,3 +117,29 @@ def load_matconvnet(filename):
     params_values_list = [params_values[p] for p in range(params_values.size)]
 
     return params_names_list, params_values_list
+
+
+def load_siamfc_stats(stats_path):
+    Stats = namedtuple('Stats', [
+        'rgb_mean_z',
+        'rgb_variance_z',
+        'rgb_mean_x',
+        'rgb_variance_x'])
+
+    mat = h5py.File(stats_path, mode='r')
+
+    rgb_mean_z = mat['z']['rgbMean'][:]
+    d, v = np.linalg.eig(mat['z']['rgbCovariance'][:])
+    rgb_variance_z = 0.1 * np.dot(np.sqrt(np.diag(d)), v.T)
+
+    rgb_mean_x = mat['x']['rgbMean'][:]
+    d, v = np.linalg.eig(mat['z']['rgbCovariance'][:])
+    rgb_variance_x = 0.1 * np.dot(np.sqrt(np.diag(d)), v.T)
+
+    stats = Stats(
+        rgb_mean_z,
+        rgb_variance_z,
+        rgb_mean_x,
+        rgb_variance_x)
+
+    return stats
