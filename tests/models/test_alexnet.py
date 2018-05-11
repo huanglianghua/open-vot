@@ -5,36 +5,59 @@ import torch
 import random
 import time
 
-from lib.models import AlexNet
+from lib.models import AlexNetV1, AlexNetV2
 
 
 class TestAlexNet(unittest.TestCase):
 
     def setUp(self):
         self.x = torch.randn((2, 3, 224, 224))
-        self.net = AlexNet()
 
     def tearDown(self):
         pass
+    
+    def test_alexnet_v1(self):
+        net = AlexNetV1()
 
-    def test_alexnet(self):
         with torch.set_grad_enabled(True):
-            self.net.train()
+            net.train()
             start = time.time()
-            out_train = self.net(self.x)
+            out_train = net(self.x)
             print('inference time of training: %.3f' % (time.time() - start))
 
             self.assertEqual(out_train.requires_grad, True)
-            self.assertEqual(self.net.training, True)
+            self.assertEqual(net.training, True)
 
         with torch.set_grad_enabled(False):
-            self.net.eval()
+            net.eval()
             start = time.time()
-            out_eval = self.net(self.x)
+            out_eval = net(self.x)
             print('inference time of test: %.3f' % (time.time() - start))
 
             self.assertEqual(out_eval.requires_grad, False)
-            self.assertEqual(self.net.training, False)
+            self.assertEqual(net.training, False)
+            self.assertNotEqual(out_train.mean(), out_eval.mean())
+
+    def test_alexnet_v2(self):
+        net = AlexNetV2()
+
+        with torch.set_grad_enabled(True):
+            net.train()
+            start = time.time()
+            out_train = net(self.x)
+            print('inference time of training: %.3f' % (time.time() - start))
+
+            self.assertEqual(out_train.requires_grad, True)
+            self.assertEqual(net.training, True)
+
+        with torch.set_grad_enabled(False):
+            net.eval()
+            start = time.time()
+            out_eval = net(self.x)
+            print('inference time of test: %.3f' % (time.time() - start))
+
+            self.assertEqual(out_eval.requires_grad, False)
+            self.assertEqual(net.training, False)
             self.assertNotEqual(out_train.mean(), out_eval.mean())
 
 

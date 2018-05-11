@@ -5,7 +5,7 @@ import torch
 import random
 import time
 
-from lib.models import SiameseNet, AlexNet
+from lib.models import SiameseNet, AlexNetV2
 
 
 class TestSiameseNet(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestSiameseNet(unittest.TestCase):
 
     def test_siamese_net(self):
         for norm in [None, 'bn', 'cosine', 'euclidean', 'linear']:
-            net = SiameseNet(AlexNet(), norm=norm)
+            net = SiameseNet(AlexNetV2(), norm=norm)
 
             with torch.set_grad_enabled(True):
                 net.train()

@@ -12,7 +12,7 @@ import numbers
 from torch.optim.lr_scheduler import StepLR
 from PIL import Image
 
-from ..models import SiameseNet, AlexNet
+from ..models import SiameseNet, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
 from ..utils.warp import crop, to_corners, pad
 from ..utils.viz import show_frame
@@ -38,7 +38,7 @@ class TrackerSiamFC(object):
         self.setup_optimizer()
 
     def setup_model(self, net_path=None):
-        self.model = SiameseNet(AlexNet(), norm='bn')
+        self.model = SiameseNet(AlexNetV2(), norm='bn')
         if net_path is not None:
             ext = os.path.splitext(net_path)[1]
             if ext == '.mat':
