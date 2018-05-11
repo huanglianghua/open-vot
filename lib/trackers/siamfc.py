@@ -12,7 +12,7 @@ import numbers
 from torch.optim.lr_scheduler import StepLR
 from PIL import Image
 
-from ..models import SiameseNet, AlexNetV2
+from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
 from ..utils.warp import crop, to_corners, pad
 from ..utils.viz import show_frame
@@ -30,15 +30,20 @@ class BCELoss(nn.Module):
 
 class TrackerSiamFC(object):
 
-    def __init__(self, net_path=None, **kargs):
+    def __init__(self, branch='alexv2', net_path=None, **kargs):
+        self.parse_args(**kargs)
         self.cuda = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if self.cuda else 'cpu')
-        self.setup_model(net_path)
-        self.parse_args(**kargs)
+        self.setup_model(branch, net_path)
         self.setup_optimizer()
 
-    def setup_model(self, net_path=None):
-        self.model = SiameseNet(AlexNetV2(), norm='bn')
+    def setup_model(self, branch='alexv2', net_path=None):
+        assert branch in ['alexv1', 'alexv2']
+        if branch == 'alexv1':
+            self.model = SiameseNet(AlexNetV1(), norm='linear')
+        elif branch == 'alexv2':
+            self.model = SiameseNet(AlexNetV2(), norm='bn')
+
         if net_path is not None:
             ext = os.path.splitext(net_path)[1]
             if ext == '.mat':
@@ -75,9 +80,10 @@ class TrackerSiamFC(object):
             'lr_mult_conv_bias': 2,
             'lr_mult_bn_weight': 2,
             'lr_mult_bn_bias': 1,
+            'lr_mult_linear_weight': 1e-3,
+            'lr_mult_linear_bias': 1e-3,
             'weight_decay': 5e-4,
-            'batch_size': 32
-        }
+            'batch_size': 32}
 
         for key in default_args:
             if key in kargs:
@@ -103,6 +109,13 @@ class TrackerSiamFC(object):
                     weight_decay *= 0
                 elif 'bias' in name:
                     lr *= self.lr_mult_bn_bias
+                    weight_decay *= 0
+            elif 'linear' in name:
+                if 'weight' in name:
+                    lr *= self.lr_mult_linear_weight
+                    weight_decay *= 1
+                elif 'bias' in name:
+                    lr *= self.lr_mult_linear_bias
                     weight_decay *= 0
             params.append({
                 'params': param,

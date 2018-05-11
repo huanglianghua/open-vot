@@ -8,6 +8,8 @@ import torch
 import scipy.io
 from urllib.request import urlretrieve
 
+from ..models import AlexNetV1, AlexNetV2
+
 
 def download(url, filename):
     return urlretrieve(url, filename, _reporthook)
@@ -40,6 +42,16 @@ def extract(filename, extract_dir):
 
 
 def load_siamfc_from_matconvnet(filename, model):
+    assert isinstance(model.branch, (AlexNetV1, AlexNetV2))
+    if isinstance(model.branch, AlexNetV1):
+        p_conv = 'conv'
+        p_bn = 'bn'
+        p_adjust = 'adjust_'
+    elif isinstance(model.branch, AlexNetV2):
+        p_conv = 'br_conv'
+        p_bn = 'br_bn'
+        p_adjust = 'fin_adjust_bn'
+
     params_names_list, params_values_list = load_matconvnet(filename)
     params_values_list = [torch.from_numpy(p) for p in params_values_list]
     for l, p in enumerate(params_values_list):
@@ -58,30 +70,35 @@ def load_siamfc_from_matconvnet(filename, model):
 
     for l, layer in enumerate(net):
         layer[0].weight.data[:] = params_values_list[
-            params_names_list.index('br_conv%df' % (l + 1))]
+            params_names_list.index('%s%df' % (p_conv, l + 1))]
         layer[0].bias.data[:] = params_values_list[
-            params_names_list.index('br_conv%db' % (l + 1))]
+            params_names_list.index('%s%db' % (p_conv, l + 1))]
 
         if l < len(net) - 1:
             layer[1].weight.data[:] = params_values_list[
-                params_names_list.index('br_bn%dm' % (l + 1))]
+                params_names_list.index('%s%dm' % (p_bn, l + 1))]
             layer[1].bias.data[:] = params_values_list[
-                params_names_list.index('br_bn%db' % (l + 1))]
+                params_names_list.index('%s%db' % (p_bn, l + 1))]
 
             bn_moments = params_values_list[
-                params_names_list.index('br_bn%dx' % (l + 1))]
+                params_names_list.index('%s%dx' % (p_bn, l + 1))]
             layer[1].running_mean[:] = bn_moments[:, 0]
             layer[1].running_var[:] = bn_moments[:, 1] ** 2
         elif model.norm.norm == 'bn':
             model.norm.bn.weight.data[:] = params_values_list[
-                params_names_list.index('fin_adjust_bnm')]
+                params_names_list.index('%sm' % p_adjust)]
             model.norm.bn.bias.data[:] = params_values_list[
-                params_names_list.index('fin_adjust_bnb')]
+                params_names_list.index('%sb' % p_adjust)]
 
             bn_moments = params_values_list[
-                params_names_list.index('fin_adjust_bnx')]
+                params_names_list.index('%sx' % p_adjust)]
             model.norm.bn.running_mean[:] = bn_moments[0]
             model.norm.bn.running_var[:] = bn_moments[1] ** 2
+        elif model.norm.norm == 'linear':
+            model.norm.linear.weight.data[:] = params_values_list[
+                params_names_list.index('%sf' % p_adjust)]
+            model.norm.linear.bias.data[:] = params_values_list[
+                params_names_list.index('%sb' % p_adjust)]
 
     return model
 

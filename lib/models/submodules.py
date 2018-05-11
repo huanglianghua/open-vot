@@ -4,8 +4,6 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 
-from ..utils import initialize_weights
-
 
 class XCorr(nn.Module):
 
@@ -31,7 +29,7 @@ class Adjust2d(nn.Module):
             self.bn = nn.BatchNorm2d(1)
         elif norm == 'linear':
             self.linear = nn.Conv2d(1, 1, 1, bias=True)
-        initialize_weights(self)
+        self._initialize_weights()
 
     def forward(self, out, z=None, x=None):
         if self.norm == 'bn':
@@ -56,3 +54,11 @@ class Adjust2d(nn.Module):
             out = out
 
         return out
+
+    def _initialize_weights(self):
+        if self.norm == 'bn':
+            self.bn.weight.data.fill_(1)
+            self.bn.bias.data.zero_()
+        elif self.norm == 'linear':
+            self.linear.weight.data.fill_(1e-6)
+            self.linear.bias.data.zero_()
