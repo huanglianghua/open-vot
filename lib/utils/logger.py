@@ -23,7 +23,8 @@ class Logger(object):
     def __exit__(self, *args):
         self.close()
 
-    def write(self, msg):
+    def log(self, msg):
+        msg = msg + '\n' if not msg[-1] == '\n' else msg
         self.console.write(msg)
         if self.file is not None:
             self.file.write(msg)

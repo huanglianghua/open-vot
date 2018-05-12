@@ -75,7 +75,7 @@ class TrackerSiamFC(object):
             'initial_lr': 1e-2,
             'final_lr': 1e-5,
             'step_size': 50,
-            'epoch_num': 5000,
+            'epoch_num': 1000,
             'lr_mult_conv_weight': 1,
             'lr_mult_conv_bias': 2,
             'lr_mult_bn_weight': 2,

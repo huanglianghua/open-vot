@@ -17,7 +17,7 @@ class TestLogger(unittest.TestCase):
     def test_logger(self):
         logger = Logger(self.log_file)
         for i in range(100):
-            logger.write('logging index %d\n' % i)
+            logger.log('logging index %d' % i)
             time.sleep(0.01)
 
         logger.flush()
