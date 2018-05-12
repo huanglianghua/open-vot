@@ -14,7 +14,7 @@ from PIL import Image
 
 from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
-from ..utils.warp import crop, to_corners, pad
+from ..utils.warp import crop
 from ..utils.viz import show_frame
 
 
@@ -234,8 +234,7 @@ class TrackerSiamFC(object):
 
         return loss.item()
 
-    def _crop(self, image, center, sizes,
-              padding='avg', out_size=None, return_npad=False):
+    def _crop(self, image, center, sizes, padding='avg', out_size=None):
         sizes = np.array(sizes)
         if sizes.ndim == 1:
             sizes = np.tile(sizes, (2, 1)).T
@@ -261,10 +260,7 @@ class TrackerSiamFC(object):
         if len(sizes) == 1:
             patches = patches[0]
 
-        if return_npad:
-            return patches, npad
-        else:
-            return patches
+        return patches
 
     def _deduce_network_params(self, exemplar_sz, search_sz):
         z = torch.zeros(1, 3, exemplar_sz, exemplar_sz).to(self.device)
