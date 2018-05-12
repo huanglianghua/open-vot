@@ -27,17 +27,18 @@ class TestSiameseNet(unittest.TestCase):
                 out_train = net(self.z, self.x)
                 print('inference time of training: %.3f' %
                       (time.time() - start))
-                self.assertEqual(out_train.requires_grad, True)
-                self.assertEqual(net.training, True)
+                self.assertTrue(out_train.requires_grad)
+                self.assertTrue(net.training)
 
             with torch.set_grad_enabled(False):
                 net.eval()
                 start = time.time()
                 out_eval = net(self.z, self.x)
                 print('inference time of test: %.3f' % (time.time() - start))
-                self.assertEqual(out_eval.requires_grad, False)
-                self.assertEqual(net.training, False)
-                self.assertNotEqual(out_train.mean(), out_eval.mean())
+                self.assertFalse(out_eval.requires_grad)
+                self.assertFalse(net.training)
+                self.assertNotAlmostEqual(
+                    out_train.mean().item(), out_eval.mean().item())
 
             if norm == 'cosine':
                 self.assertGreaterEqual(out_train.min().item(), -1)
