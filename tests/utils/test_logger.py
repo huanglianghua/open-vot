@@ -10,7 +10,7 @@ class TestLogger(unittest.TestCase):
 
     def setUp(self):
         self.log_file = 'logs/unit_test.log'
-    
+
     def tearDown(self):
         pass
 

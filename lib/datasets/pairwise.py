@@ -65,7 +65,7 @@ class Pairwise(Dataset):
             rand_z = np.random.choice(n - 1)
         else:
             rand_z = np.random.choice(n)
-        
+
         if self.frame_range == 0:
             return rand_z, rand_z
 

@@ -68,7 +68,7 @@ class TransformGOTURN(object):
         rand_center = center + size * shift_factors
         rand_center = np.clip(
             rand_center, rand_sz / 2, img_sz - rand_sz / 2)
-        
+
         rand_bndbox = np.concatenate([
             rand_center - rand_sz / 2, rand_sz])
 

@@ -15,7 +15,7 @@ class TestAlexNet(unittest.TestCase):
 
     def tearDown(self):
         pass
-    
+
     def test_alexnet_v1(self):
         net = AlexNetV1()
 

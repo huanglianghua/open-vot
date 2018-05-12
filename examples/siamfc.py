@@ -80,18 +80,18 @@ elif args.phase == 'train':
     dataloader_train = DataLoader(
         dataset_train, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=True, num_workers=4)
-    dataset_val= Pairwise(
+    dataset_val = Pairwise(
         VOT(vot_dir, return_bndbox=True), transform=transform, subset='val')
-    dataloader_val= DataLoader(
+    dataloader_val = DataLoader(
         dataset_val, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=False, num_workers=4)
 
-    iter_num= len(dataloader_train)
+    iter_num = len(dataloader_train)
     for epoch in range(epoch_num):
         # training loop
-        loss_epoch= 0
+        loss_epoch = 0
         for it, batch in enumerate(dataloader_train):
-            loss= tracker.step(batch, backward=True, update_lr=(it == 0))
+            loss = tracker.step(batch, backward=True, update_lr=(it == 0))
             loss_epoch += loss
             logger.log('Epoch: {}/{} Iter: {}/{} Loss: {:.5f}'.format(
                 epoch + 1, epoch_num, it + 1, iter_num, loss))
@@ -99,9 +99,9 @@ elif args.phase == 'train':
         loss_epoch /= iter_num
 
         # validation loop
-        loss_val= 0
+        loss_val = 0
         for it, batch in enumerate(dataloader_val):
-            loss= tracker.step(batch, backward=False, update_lr=False)
+            loss = tracker.step(batch, backward=False, update_lr=False)
             loss_val += loss
 
         loss_val /= len(dataloader_val)

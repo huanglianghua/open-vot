@@ -57,7 +57,7 @@ class TrackerGOTURN(object):
                 self.model.load_state_dict(state_dict)
             else:
                 raise Exception('unsupport file extention')
-        
+
         self.model = nn.DataParallel(self.model).to(self.device)
 
     def setup_optimizer(self):
@@ -83,7 +83,7 @@ class TrackerGOTURN(object):
                 'params': param,
                 'initial_lr': lr,
                 'weight_decay': weight_decay})
-        
+
         self.optimizer = optim.SGD(
             params, lr=self.base_lr,
             momentum=self.momentum,
@@ -101,7 +101,7 @@ class TrackerGOTURN(object):
             self.image_prev, self.bndbox_prev)
         x, roi = self._crop(
             image, self.bndbox_prev, return_roi=True)
-        
+
         corners = self._locate_target(z, x)
         corners = corners.squeeze().cpu().numpy()
         corners /= self.scale_factor
@@ -165,7 +165,7 @@ class TrackerGOTURN(object):
             if backward:
                 loss.backward()
                 self.optimizer.step()
-        
+
         return loss.item()
 
     def _crop(self, image, bndbox, return_roi=False):
@@ -192,5 +192,5 @@ class TrackerGOTURN(object):
         with torch.set_grad_enabled(False):
             self.model.eval()
             corners = self.model(z, x)
-        
+
         return corners

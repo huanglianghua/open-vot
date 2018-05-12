@@ -33,7 +33,8 @@ class TestTransformGOTURN(unittest.TestCase):
         if self.visualize:
             for t in range(10):
                 crop_z, crop_x, labels = random.choice(dataset)
-                mean_color = torch.tensor(transform.mean_color).float().view(3, 1, 1)
+                mean_color = torch.tensor(
+                    transform.mean_color).float().view(3, 1, 1)
                 crop_z = F.to_pil_image((crop_z + mean_color) / 255.0)
                 crop_x = F.to_pil_image((crop_x + mean_color) / 255.0)
                 labels = labels.cpu().numpy()

@@ -33,7 +33,8 @@ class TestGOTURN(unittest.TestCase):
             print('inference time of test: %.3f' % (time.time() - start))
             self.assertFalse(self.net.training)
             self.assertFalse(out_eval.requires_grad)
-            self.assertNotAlmostEqual(out_train.mean().item(), out_eval.mean().item())
+            self.assertNotAlmostEqual(
+                out_train.mean().item(), out_eval.mean().item())
 
 
 if __name__ == '__main__':
