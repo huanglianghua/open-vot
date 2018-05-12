@@ -31,7 +31,7 @@ class GOTURN(nn.Module):
         initialize_weights(self)
 
     def forward(self, z, x):
-        assert z.size(-1) == x.size(-1) == 256
+        assert z.size(-1) == x.size(-1) == 227
         z = self.branch_z(z)
         x = self.branch_x(x)
         out = torch.cat((z, x), dim=1)

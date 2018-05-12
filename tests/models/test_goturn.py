@@ -10,8 +10,8 @@ from lib.models import GOTURN
 class TestGOTURN(unittest.TestCase):
 
     def setUp(self):
-        self.z = torch.randn((2, 3, 256, 256))
-        self.x = torch.randn((2, 3, 256, 256))
+        self.z = torch.randn((2, 3, 227, 227))
+        self.x = torch.randn((2, 3, 227, 227))
         self.net = GOTURN()
 
     def tearDown(self):

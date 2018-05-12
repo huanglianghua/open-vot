@@ -53,7 +53,7 @@ class TestTrackerSiamFC(unittest.TestCase):
 
     def test_siamfc_track_v2(self):
         dataset = VOT(self.vot_dir, return_bndbox=True)
-        tracker = TrackerSiamFC(branch='alexv2', net_path=self.net_path)
+        tracker = TrackerSiamFC(branch='alexv2', net_path=self.net_v2)
 
         img_files, anno = random.choice(dataset)
         rects, speed = tracker.track(img_files, anno[0, :],

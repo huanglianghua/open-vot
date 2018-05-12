@@ -20,7 +20,7 @@ class CaffeNet(nn.Module):
             nn.MaxPool2d(3, 2),
             nn.LocalResponseNorm(5, alpha=1e-4, beta=0.75))
         self.conv3 = nn.Sequential(
-            nn.Conv2d(256, 384, 3, 1, padding=1, groups=2),
+            nn.Conv2d(256, 384, 3, 1, padding=1),
             nn.ReLU(inplace=True))
         self.conv4 = nn.Sequential(
             nn.Conv2d(384, 384, 3, 1, padding=1, groups=2),

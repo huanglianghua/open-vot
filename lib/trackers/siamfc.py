@@ -37,28 +37,8 @@ class TrackerSiamFC(object):
         self.setup_model(branch, net_path)
         self.setup_optimizer()
 
-    def setup_model(self, branch='alexv2', net_path=None):
-        assert branch in ['alexv1', 'alexv2']
-        if branch == 'alexv1':
-            self.model = SiameseNet(AlexNetV1(), norm='linear')
-        elif branch == 'alexv2':
-            self.model = SiameseNet(AlexNetV2(), norm='bn')
-
-        if net_path is not None:
-            ext = os.path.splitext(net_path)[1]
-            if ext == '.mat':
-                load_siamfc_from_matconvnet(net_path, self.model)
-            elif ext == '.pt':
-                state_dict = torch.load(
-                    net_path, map_location=lambda storage, loc: storage)
-                self.model.load_state_dict(state_dict)
-            else:
-                raise Exception('unknown file extension')
-
-        self.branch = nn.DataParallel(self.model.branch).to(self.device)
-        self.model = nn.DataParallel(self.model).to(self.device)
-
     def parse_args(self, **kargs):
+        # default branch is AlexNetV2
         default_args = {
             'exemplar_sz': 127,
             'search_sz': 255,
@@ -90,6 +70,27 @@ class TrackerSiamFC(object):
                 setattr(self, key, kargs[key])
             else:
                 setattr(self, key, default_args[key])
+
+    def setup_model(self, branch='alexv2', net_path=None):
+        assert branch in ['alexv1', 'alexv2']
+        if branch == 'alexv1':
+            self.model = SiameseNet(AlexNetV1(), norm='linear')
+        elif branch == 'alexv2':
+            self.model = SiameseNet(AlexNetV2(), norm='bn')
+
+        if net_path is not None:
+            ext = os.path.splitext(net_path)[1]
+            if ext == '.mat':
+                load_siamfc_from_matconvnet(net_path, self.model)
+            elif ext == '.pt':
+                state_dict = torch.load(
+                    net_path, map_location=lambda storage, loc: storage)
+                self.model.load_state_dict(state_dict)
+            else:
+                raise Exception('unsupport file extension')
+
+        self.branch = nn.DataParallel(self.model.branch).to(self.device)
+        self.model = nn.DataParallel(self.model).to(self.device)
 
     def setup_optimizer(self):
         params = []
@@ -197,7 +198,9 @@ class TrackerSiamFC(object):
 
         elapsed_time = 0
         for f, img_file in enumerate(img_files):
-            image = Image.open(img_file).convert('RGB')
+            image = Image.open(img_file)
+            if image.mode == 'L':
+                image = image.convert('RGB')
 
             start_time = time.time()
             if f == 0:
@@ -294,6 +297,7 @@ class TrackerSiamFC(object):
     def _calc_score(self, z, x):
         scores = F.conv2d(x, z)
         with torch.set_grad_enabled(False):
+            self.model.module.norm.eval()
             scores = self.model.module.norm(scores, z, x).squeeze(1)
 
         scores = np.stack(
