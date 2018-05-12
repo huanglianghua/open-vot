@@ -34,7 +34,7 @@ class TransformGOTURN(object):
         # convert data to tensors
         crop_z = 255.0 * F.to_tensor(crop_z)
         crop_x = 255.0 * F.to_tensor(crop_x)
-        labels = torch.from_numpy(labels)
+        labels = torch.from_numpy(labels).float()
 
         # color augmentation
         mean_color = torch.tensor(self.mean_color).float().view(3, 1, 1)

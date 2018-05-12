@@ -24,7 +24,7 @@ class TestTransformGOTURN(unittest.TestCase):
         base_dataset = VOT(self.vot_dir, return_bndbox=True)
         transform = TransformGOTURN()
         dataset = Pairwise(
-            base_dataset, transform=transform, subset='train')
+            base_dataset, transform, frame_range=1, causal=True)
         self.assertGreater(len(dataset), 0)
 
         for crop_z, crop_x, labels in dataset:

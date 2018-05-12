@@ -6,5 +6,4 @@ Open-VOT is a lightweight library of visual object tracking for research purpose
 
 ## Installation
 
-Install [PyTorch](http://pytorch.org/) (version >= 0.4.0). Although we support
-both python2 and python3, we recommend python3 for better performance.
+Install [PyTorch](http://pytorch.org/) (version >= 0.4.0). Currently we only support python3.

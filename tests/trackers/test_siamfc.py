@@ -40,16 +40,16 @@ class TestTrackerSiamFC(unittest.TestCase):
         dataset = Pairwise(base_dataset, transform)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
-        # training step
+        # training loop
         for it, batch in enumerate(dataloader):
             update_lr = it == 0
-            loss = tracker.step(batch, update_lr=update_lr)
-            print('Iter: {} Loss: {:.6f}'.format(it, loss))
+            loss = tracker.step(batch, backward=True, update_lr=update_lr)
+            print('Iter: {} Loss: {:.6f}'.format(it + 1, loss))
 
-        # val step
+        # val loop
         for it, batch in enumerate(dataloader):
             loss = tracker.step(batch, backward=False)
-            print('Val. Iter: {} Loss: {:.6f}'.format(it, loss))
+            print('Val. Iter: {} Loss: {:.6f}'.format(it + 1, loss))
 
     def test_siamfc_track_v2(self):
         dataset = VOT(self.vot_dir, return_bndbox=True)
@@ -69,16 +69,16 @@ class TestTrackerSiamFC(unittest.TestCase):
         dataset = Pairwise(base_dataset, transform)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
-        # training step
+        # training loop
         for it, batch in enumerate(dataloader):
             update_lr = it == 0
-            loss = tracker.step(batch, update_lr=update_lr)
-            print('Iter: {} Loss: {:.6f}'.format(it, loss))
+            loss = tracker.step(batch, backward=True, update_lr=update_lr)
+            print('Iter: {} Loss: {:.6f}'.format(it + 1, loss))
 
-        # val step
+        # val loop
         for it, batch in enumerate(dataloader):
             loss = tracker.step(batch, backward=False)
-            print('Val. Iter: {} Loss: {:.6f}'.format(it, loss))
+            print('Val. Iter: {} Loss: {:.6f}'.format(it + 1, loss))
 
 
 if __name__ == '__main__':
