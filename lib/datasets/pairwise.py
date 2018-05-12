@@ -8,7 +8,7 @@ from PIL import Image
 class Pairwise(Dataset):
 
     def __init__(self, base_dataset, transform=None,
-                 frame_range=100, return_index=False,
+                 frame_range=100, causal=False, return_index=False,
                  rand_choice=False, subset='train', train_ratio=0.95):
         super(Pairwise, self).__init__()
         assert subset in ['train', 'val']
@@ -16,6 +16,7 @@ class Pairwise(Dataset):
         self.base_dataset = base_dataset
         self.transform = transform
         self.frame_range = frame_range
+        self.causal = causal
         self.return_index = return_index
         self.rand_choice = rand_choice
 
@@ -60,12 +61,22 @@ class Pairwise(Dataset):
         return len(self.indices)
 
     def _sample_pair(self, n):
-        rand_z = np.random.choice(n)
+        if self.causal:
+            rand_z = np.random.choice(n - 1)
+        else:
+            rand_z = np.random.choice(n)
+        
+        if self.frame_range == 0:
+            return rand_z, rand_z
+
         possible_x = np.arange(
             rand_z - self.frame_range,
             rand_z + self.frame_range + 1)
         possible_x = np.intersect1d(possible_x, np.arange(n))
-        possible_x = possible_x[possible_x != rand_z]
+        if self.causal:
+            possible_x = possible_x[possible_x > rand_z]
+        else:
+            possible_x = possible_x[possible_x != rand_z]
         rand_x = np.random.choice(possible_x)
 
         return rand_z, rand_x

@@ -18,12 +18,15 @@ class TestPairwise(unittest.TestCase):
 
     def test_pairwise(self):
         base_dataset = OTB(self.otb_dir)
+        frame_range = random.choice([0, 1, 100])
+        causal = random.choice([True, False])
         subset = random.choice(['train', 'val'])
         return_index = random.choice([True, False])
         rand_choice = random.choice([True, False])
         dataset = Pairwise(
-            base_dataset, subset=subset,
-            return_index=return_index, rand_choice=rand_choice)
+            base_dataset, frame_range=frame_range, causal=causal,
+            subset=subset, return_index=return_index,
+            rand_choice=rand_choice)
         self.assertGreater(len(dataset), 0)
 
         for i, item in enumerate(dataset):
