@@ -26,7 +26,7 @@ init_net_path = 'pretrained/goturn/tracker.pt'
 
 if args.phase == 'test':
     tracker = TrackerGOTURN(net_path, **config)
-    dataset = VOT(vot_dir, return_bndbox=True)
+    dataset = VOT(vot_dir, return_bndbox=True, download=True)
     logger = Logger('logs/goturn.log')
 
     avg_iou = 0
@@ -67,12 +67,12 @@ elif args.phase == 'train':
     epoch_num = config['epoch_num']
 
     dataset_train = Pairwise(
-        VOT(vot_dir, return_bndbox=True), transform=transform, subset='train')
+        VOT(vot_dir, return_bndbox=True, download=True), transform=transform, subset='train')
     dataloader_train = DataLoader(
         dataset_train, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=True, num_workers=4)
     dataset_val = Pairwise(
-        VOT(vot_dir, return_bndbox=True), transform=transform, subset='val')
+        VOT(vot_dir, return_bndbox=True, download=True), transform=transform, subset='val')
     dataloader_val = DataLoader(
         dataset_val, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=False, num_workers=4)

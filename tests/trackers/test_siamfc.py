@@ -21,7 +21,7 @@ class TestTrackerSiamFC(unittest.TestCase):
         pass
 
     def test_siamfc_track_v1(self):
-        dataset = VOT(self.vot_dir, return_bndbox=True)
+        dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         tracker = TrackerSiamFC(
             branch='alexv1', net_path=self.net_v1, z_lr=0,
             response_up=16, scale_step=1.0375, window_influence=0.176)
@@ -36,7 +36,7 @@ class TestTrackerSiamFC(unittest.TestCase):
         transform = TransformSiamFC(
             score_sz=17, stats_path=self.stats_path)
 
-        base_dataset = VOT(self.vot_dir, return_bndbox=True)
+        base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         dataset = Pairwise(base_dataset, transform)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
@@ -52,7 +52,7 @@ class TestTrackerSiamFC(unittest.TestCase):
             print('Val. Iter: {} Loss: {:.6f}'.format(it + 1, loss))
 
     def test_siamfc_track_v2(self):
-        dataset = VOT(self.vot_dir, return_bndbox=True)
+        dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         tracker = TrackerSiamFC(branch='alexv2', net_path=self.net_v2)
 
         img_files, anno = random.choice(dataset)
@@ -65,7 +65,7 @@ class TestTrackerSiamFC(unittest.TestCase):
         transform = TransformSiamFC(
             score_sz=33, stats_path=self.stats_path)
 
-        base_dataset = VOT(self.vot_dir, return_bndbox=True)
+        base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         dataset = Pairwise(base_dataset, transform)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 

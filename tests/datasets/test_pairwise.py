@@ -17,7 +17,7 @@ class TestPairwise(unittest.TestCase):
         pass
 
     def test_pairwise(self):
-        base_dataset = OTB(self.otb_dir)
+        base_dataset = OTB(self.otb_dir, download=True)
         frame_range = random.choice([0, 1, 100])
         causal = random.choice([True, False])
         subset = random.choice(['train', 'val'])

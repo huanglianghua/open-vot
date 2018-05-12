@@ -18,7 +18,7 @@ class TestWarp(unittest.TestCase):
         pass
 
     def test_pad(self):
-        dataset = OTB(self.otb_dir)
+        dataset = OTB(self.otb_dir, download=True)
 
         npad = random.choice([0, 10, 50])
         padding = random.choice([None, 0, 'avg'])
@@ -31,7 +31,7 @@ class TestWarp(unittest.TestCase):
             show_frame(image, fig_n=1)
 
     def test_crop(self):
-        dataset = OTB(self.otb_dir)
+        dataset = OTB(self.otb_dir, download=True)
 
         padding = random.choice([None, 0, 'avg'])
         out_size = random.choice([None, 255])

@@ -19,7 +19,7 @@ class TestTrackerGOTURN(unittest.TestCase):
         pass
 
     def test_goturn_track(self):
-        dataset = VOT(self.vot_dir, return_bndbox=True)
+        dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         tracker = TrackerGOTURN(self.net_path)
 
         img_files, anno = random.choice(dataset)
@@ -31,7 +31,7 @@ class TestTrackerGOTURN(unittest.TestCase):
         tracker = TrackerGOTURN(net_path=self.net_path)
         transform = TransformGOTURN()
 
-        base_dataset = VOT(self.vot_dir, return_bndbox=True)
+        base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         dataset = Pairwise(
             base_dataset, transform, frame_range=1, causal=True)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
