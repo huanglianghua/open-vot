@@ -60,5 +60,5 @@ class Adjust2d(nn.Module):
             self.bn.weight.data.fill_(1)
             self.bn.bias.data.zero_()
         elif self.norm == 'linear':
-            self.linear.weight.data.fill_(1e-6)
+            self.linear.weight.data.fill_(1e-3)
             self.linear.bias.data.zero_()

@@ -5,37 +5,28 @@ import json
 import torch
 from torch.utils.data import DataLoader
 
-from lib.trackers import TrackerSiamFC
+from lib.trackers import TrackerGOTURN
 from lib.datasets import VOT, Pairwise
-from lib.metrics import iou, center_error
 from lib.utils.logger import Logger
-from lib.transforms import TransformSiamFC
+from lib.transforms import TransformGOTURN
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-b', '--branch', type=str,
-                    default='alexv1', choices=['alexv1', 'alexv2'])
-parser.add_argument('-p', '--phase', type=str,
-                    default='test', choices=['train', 'test'])
+parser.add_argument('-p', '--phase', type=str, default='test', choices=['train', 'test'])
 args = parser.parse_args()
 
 # paths
-config_file = 'config/siamfc.json'
-vot_dir = 'data/vot2017'
-net_paths = {
-    'alexv1': 'pretrained/siamfc/2016-08-17.net.mat',
-    'alexv2': 'pretrained/siamfc/baseline-conv5_e55.mat'}
-stats_path = 'pretrained/siamfc/cfnet_ILSVRC2015.stats.mat'
-
+config_file = 'config/goturn.json'
 with open(config_file) as f:
     config = json.load(f)
-config = config[args.branch]
-net_path = net_paths[args.branch]
+vot_dir = 'data/vot2017'
+net_path = 'pretrained/goturn/tracker.pt'
+init_net_path = 'pretrained/goturn/tracker.pt'
 
 if args.phase == 'test':
-    tracker = TrackerSiamFC(args.branch, net_path, **config)
+    tracker = TrackerGOTURN(net_path, **config)
     dataset = VOT(vot_dir, return_bndbox=True)
-    logger = Logger('logs/siamfc_%s.log' % args.branch)
+    logger = Logger('logs/goturn.log')
 
     avg_iou = 0
     avg_prec = 0
@@ -48,7 +39,7 @@ if args.phase == 'test':
         # tracking loop
         bndboxes, speed_fps = tracker.track(
             img_files, anno[0, :], visualize=True)
-
+        
         mean_iou = iou(bndboxes, anno).mean()
         prec = (center_error(bndboxes, anno) <= 20).sum() / len(anno)
         logger.log('- Performance on {}: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f}'.format(
@@ -64,13 +55,11 @@ if args.phase == 'test':
     avg_prec /= total_frames
     avg_speed /= total_frames
 
-    logger.log('- Overall Performance: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f}'.format(
-        avg_iou, avg_prec, avg_speed))
+    logger.log('- Overall Performance: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f}'.format(avg_iou, avg_prec, avg_speed))
 elif args.phase == 'train':
-    tracker = TrackerSiamFC(args.branch, None, **config)
-    transform = TransformSiamFC(
-        score_sz=config['score_sz'], r_pos=config['r_pos'], total_stride=config['total_stride'], stats_path=stats_path)
-    logger = Logger('logs/siamfc_%s_train.log' % args.branch)
+    tracker = TrackerGOTURN(init_net_path, **config)
+    transform = TransformGOTURN()
+    logger = Logger('logs/goturn_train.log')
 
     cuda = torch.cuda.is_available()
     epoch_num = config['epoch_num']

@@ -1,0 +1,20 @@
+{
+    "context": 2,
+    "scale_factor": 10,
+    "input_dim": 227,
+    "mean_color": [104, 117, 123],
+    "base_lr": 1e-06,
+    "weight_decay": 0.0005,
+    "momentum": 0.9,
+    "lr_step_size": 2000,
+    "gamma": 0.1,
+    "epoch_num": 10000,
+    "lr_mult_fc_weight": 10,
+    "lr_mult_fc_bias": 20,
+    "lr_mult_conv": 0,
+    "batch_size": 25,
+    "lambda_shift": 5,
+    "lambda_scale": 15,
+    "min_scale": -0.4,
+    "max_scale": 0.4
+}

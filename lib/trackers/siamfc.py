@@ -60,8 +60,8 @@ class TrackerSiamFC(object):
             'lr_mult_conv_bias': 2,
             'lr_mult_bn_weight': 2,
             'lr_mult_bn_bias': 1,
-            'lr_mult_linear_weight': 1e-3,
-            'lr_mult_linear_bias': 1e-3,
+            'lr_mult_linear_weight': 0,
+            'lr_mult_linear_bias': 1,
             'weight_decay': 5e-4,
             'batch_size': 32}
 

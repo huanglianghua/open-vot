@@ -17,15 +17,15 @@
         "initial_lr": 1e-02,
         "final_lr": 1e-05,
         "step_size": 50,
-        "epoch_num": 1000,
+        "epoch_num": 500,
         "lr_mult_conv_weight": 1,
         "lr_mult_conv_bias": 2,
         "lr_mult_bn_weight": 2,
         "lr_mult_bn_bias": 1,
-        "lr_mult_linear_weight": 0.001,
-        "lr_mult_linear_bias": 0.001,
-        "weight_decay": 0.0005,
-        "batch_size": 32
+        "lr_mult_linear_weight": 0,
+        "lr_mult_linear_bias": 1,
+        "weight_decay": 5e-4,
+        "batch_size": 8
     },
     "alexv2": {
         "exemplar_sz": 127,
@@ -50,9 +50,9 @@
         "lr_mult_conv_bias": 2,
         "lr_mult_bn_weight": 2,
         "lr_mult_bn_bias": 1,
-        "lr_mult_linear_weight": 0.001,
-        "lr_mult_linear_bias": 0.001,
-        "weight_decay": 0.0005,
+        "lr_mult_linear_weight": 0,
+        "lr_mult_linear_bias": 1,
+        "weight_decay": 5e-4,
         "batch_size": 32
     }
 }
