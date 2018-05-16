@@ -11,7 +11,7 @@ Open-VOT is a lightweight library of visual object tracking for research purpose
 Install [PyTorch](http://pytorch.org/) (version >= 0.4.0) and other dependencies:
 
 ```shell
-pip install h5py scipy matplotlib
+pip install h5py scipy matplotlib tensorboardX
 ```
 
 ## Examples

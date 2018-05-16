@@ -35,7 +35,7 @@ net_path = net_paths[args.branch]
 if args.phase == 'test':
     tracker = TrackerSiamFC(args.branch, net_path, **config)
     dataset = VOT(vot_dir, return_bndbox=True, download=True)
-    logger = Logger('logs/siamfc_%s.log' % args.branch)
+    logger = Logger('logs/siamfc_%s' % args.branch)
 
     avg_iou = 0
     avg_prec = 0
@@ -70,7 +70,7 @@ elif args.phase == 'train':
     tracker = TrackerSiamFC(args.branch, None, **config)
     transform = TransformSiamFC(
         score_sz=config['score_sz'], r_pos=config['r_pos'], total_stride=config['total_stride'], stats_path=stats_path)
-    logger = Logger('logs/siamfc_%s_train.log' % args.branch)
+    logger = Logger('logs/siamfc_%s_train' % args.branch)
 
     cuda = torch.cuda.is_available()
     epoch_num = config['epoch_num']

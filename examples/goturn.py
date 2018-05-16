@@ -27,7 +27,7 @@ init_net_path = 'pretrained/goturn/tracker.pt'
 if args.phase == 'test':
     tracker = TrackerGOTURN(net_path, **config)
     dataset = VOT(vot_dir, return_bndbox=True, download=True)
-    logger = Logger('logs/goturn.log')
+    logger = Logger('logs/goturn')
 
     avg_iou = 0
     avg_prec = 0
