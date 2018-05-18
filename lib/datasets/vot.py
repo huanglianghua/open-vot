@@ -10,11 +10,11 @@ from ..utils.ioutil import download, extract
 
 class VOT(object):
 
-    def __init__(self, root_dir, return_bndbox=False,
+    def __init__(self, root_dir, return_rect=False,
                  download=False, version=2017):
         super(VOT, self).__init__()
         self.root_dir = root_dir
-        self.return_bndbox = return_bndbox
+        self.return_rect = return_rect
         if download:
             self._download(self.root_dir, version)
 
@@ -36,7 +36,7 @@ class VOT(object):
         img_files = sorted(glob.glob(
             os.path.join(self.seq_dirs[index], '*.jpg')))
         anno = np.loadtxt(self.anno_files[index], delimiter=',')
-        if self.return_bndbox and anno.shape[1] == 8:
+        if self.return_rect and anno.shape[1] == 8:
             anno = self._corner2rect(anno)
 
         return img_files, anno

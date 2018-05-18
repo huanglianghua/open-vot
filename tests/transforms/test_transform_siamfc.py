@@ -21,7 +21,7 @@ class TestTransformSiamFC(unittest.TestCase):
         pass
 
     def test_transform_siamfc(self):
-        base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
+        base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
         transform = TransformSiamFC(stats_path=self.stats_path)
         dataset = Pairwise(
             base_dataset, transform=transform, subset='train')

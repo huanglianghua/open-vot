@@ -34,7 +34,7 @@ net_path = net_paths[args.branch]
 
 if args.phase == 'test':
     tracker = TrackerSiamFC(args.branch, net_path, **config)
-    dataset = VOT(vot_dir, return_bndbox=True, download=True)
+    dataset = VOT(vot_dir, return_rect=True, download=True)
     logger = Logger('logs/siamfc_%s' % args.branch)
 
     avg_iou = 0
@@ -76,12 +76,12 @@ elif args.phase == 'train':
     epoch_num = config['epoch_num']
 
     dataset_train = Pairwise(
-        VOT(vot_dir, return_bndbox=True, download=True), transform=transform, subset='train')
+        VOT(vot_dir, return_rect=True, download=True), transform=transform, subset='train')
     dataloader_train = DataLoader(
         dataset_train, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=True, num_workers=4)
     dataset_val = Pairwise(
-        VOT(vot_dir, return_bndbox=True, download=True), transform=transform, subset='val')
+        VOT(vot_dir, return_rect=True, download=True), transform=transform, subset='val')
     dataloader_val = DataLoader(
         dataset_val, batch_size=config['batch_size'], shuffle=True,
         pin_memory=cuda, drop_last=False, num_workers=4)

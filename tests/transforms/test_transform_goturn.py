@@ -21,7 +21,7 @@ class TestTransformGOTURN(unittest.TestCase):
         pass
 
     def test_transform_goturn(self):
-        base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
+        base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
         transform = TransformGOTURN()
         dataset = Pairwise(
             base_dataset, transform, frame_range=1, causal=True)

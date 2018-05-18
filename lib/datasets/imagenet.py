@@ -10,13 +10,13 @@ import random
 
 class ImageNetVID(object):
 
-    def __init__(self, root_dir, return_bndbox=False,
+    def __init__(self, root_dir, return_rect=False,
                  subset='train', rand_choice=True, download=False):
         r'''TODO: make the track_id sampling deterministic
         '''
         super(ImageNetVID, self).__init__()
         self.root_dir = root_dir
-        self.return_bndbox = return_bndbox
+        self.return_rect = return_rect
         self.rand_choice = rand_choice
         if download:
             self._download(self.root_dir)
@@ -75,7 +75,7 @@ class ImageNetVID(object):
         img_files = [os.path.join(
             self.seq_dirs[index], '%06d.JPEG' % f) for f in frames]
         anno = np.array(anno)
-        if self.return_bndbox:
+        if self.return_rect:
             anno[:, 2:] = anno[:, 2:] - anno[:, :2] + 1
 
         return img_files, anno
@@ -93,11 +93,11 @@ class ImageNetVID(object):
 
 class ImageNetObject(object):
 
-    def __init__(self, root_dir, return_bndbox=False,
+    def __init__(self, root_dir, return_rect=False,
                  subset='train', download=False):
         super(ImageNetObject, self).__init__()
         self.root_dir = root_dir
-        self.return_bndbox = return_bndbox
+        self.return_rect = return_rect
         if download:
             self._download(self.root_dir)
 
@@ -148,7 +148,7 @@ class ImageNetObject(object):
             int(rand_object.find('bndbox/ymin').text),
             int(rand_object.find('bndbox/xmax').text),
             int(rand_object.find('bndbox/ymax').text)])
-        if self.return_bndbox:
+        if self.return_rect:
             bndbox[2:] = bndbox[2:] - bndbox[:2] + 1
 
         return img_file, bndbox

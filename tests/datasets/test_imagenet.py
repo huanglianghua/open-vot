@@ -20,7 +20,7 @@ class TestImageNet(unittest.TestCase):
         pass
 
     def test_imagenet_vid(self):
-        dataset = ImageNetVID(self.vid_dir, return_bndbox=True)
+        dataset = ImageNetVID(self.vid_dir, return_rect=True)
         self.assertGreater(len(dataset), 0)
 
         for i in range(10):
@@ -37,7 +37,7 @@ class TestImageNet(unittest.TestCase):
     def test_imagenet_obj(self):
         subset = random.choice(['train', 'val'])
         dataset = ImageNetObject(
-            self.obj_dir, subset=subset, return_bndbox=True)
+            self.obj_dir, subset=subset, return_rect=True)
         self.assertGreater(len(dataset), 0)
 
         for i in range(10):
