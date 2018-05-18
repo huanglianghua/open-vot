@@ -82,7 +82,7 @@ class TrackerSiamFC(object):
             ext = os.path.splitext(net_path)[1]
             if ext == '.mat':
                 load_siamfc_from_matconvnet(net_path, self.model)
-            elif ext == '.pt':
+            elif ext == '.pth':
                 state_dict = torch.load(
                     net_path, map_location=lambda storage, loc: storage)
                 self.model.load_state_dict(state_dict)

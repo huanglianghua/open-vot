@@ -31,7 +31,8 @@ class Logger(SummaryWriter):
             'language': 'Python %s' % platform.python_version(),
             'platform': platform.platform(),
             'computer': platform.node()})
-        json.dump(meta, open(filename, 'w'), indent=4)
+        with open(filename, 'w') as f:
+            json.dump(meta, f, indent=4)
 
     def add_text(self, tag, text_string, global_step=None):
         super(Logger, self).add_text(tag, text_string, global_step)
@@ -41,10 +42,11 @@ class Logger(SummaryWriter):
     def add_array(self, tag, array, global_step=None):
         if global_step is None:
             filename = os.path.join(
-                self.log_dir, 'arrays', tag + '.txt')
+                self.log_dir, 'arrays/%s.txt' % tag)
         else:
             filename = os.path.join(
-                self.log_dir, 'arrays', 'step_%d' % (global_step + 1))
+                self.log_dir, 'arrays/%s_step%d.txt' %
+                (tag, global_step + 1))
 
         dirname = os.path.dirname(filename)
         if not os.path.isdir(dirname):
@@ -54,10 +56,10 @@ class Logger(SummaryWriter):
     def add_checkpoint(self, tag, state_dict, global_step=None):
         if global_step is None:
             filename = os.path.join(
-                self.log_dir, 'checkpoints/%s.pt' % tag)
+                self.log_dir, 'checkpoints/%s.pth' % tag)
         else:
             filename = os.path.join(
-                self.log_dir, 'checkpoints/%s_%d.pt' %
+                self.log_dir, 'checkpoints/%s_step%d.pth' %
                 (tag, global_step + 1))
 
         dirname = os.path.dirname(filename)

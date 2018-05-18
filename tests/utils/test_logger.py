@@ -17,16 +17,11 @@ class TestLogger(unittest.TestCase):
         pass
     
     def test_logger(self):
-        self.logger.add_scalar('data/unittest', 3)
-        self.logger.add_text('info', 'unit test started')
-        self.logger.add_array('x', np.random.rand(5, 5))
-        self.logger.add_checkpoint('x', self.model.state_dict())
-
         for it in range(100):
             self.logger.add_scalar('data/unittest', 3, it)
-            self.logger.add_text('info', 'iter %d' % (it + 1), it)
-            self.logger.add_array('x', np.random.rand(5, 5), it)
-            self.logger.add_checkpoint('x', self.model.state_dict(), it)
+            self.logger.add_text('unittest', 'iter %d' % (it + 1), it)
+            self.logger.add_array('unittest', np.random.rand(5, 5), it)
+            self.logger.add_checkpoint('unittest', self.model.state_dict(), it)
 
 
 if __name__ == '__main__':

@@ -13,7 +13,7 @@ class TestTrackerGOTURN(unittest.TestCase):
 
     def setUp(self):
         self.vot_dir = 'data/vot2017'
-        self.net_path = 'pretrained/goturn/tracker.pt'
+        self.net_path = 'pretrained/goturn/tracker.pth'
 
     def tearDown(self):
         pass

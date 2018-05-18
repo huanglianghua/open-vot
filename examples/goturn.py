@@ -21,8 +21,8 @@ config_file = 'config/goturn.json'
 with open(config_file) as f:
     config = json.load(f)
 vot_dir = 'data/vot2017'
-net_path = 'pretrained/goturn/tracker.pt'
-init_net_path = 'pretrained/goturn/tracker.pt'
+net_path = 'pretrained/goturn/tracker.pth'
+init_net_path = 'pretrained/goturn/tracker.pth'
 
 if args.phase == 'test':
     tracker = TrackerGOTURN(net_path, **config)

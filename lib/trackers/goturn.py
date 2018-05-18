@@ -51,7 +51,7 @@ class TrackerGOTURN(object):
         self.model = GOTURN()
         if net_path is not None:
             ext = os.path.splitext(net_path)[1]
-            if ext == '.pt':
+            if ext == '.pth':
                 state_dict = torch.load(
                     net_path, map_location=lambda storage, loc: storage)
                 self.model.load_state_dict(state_dict)
