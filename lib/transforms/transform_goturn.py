@@ -5,23 +5,31 @@ import torch
 import numpy as np
 import math
 
+from ..utils import dict2tuple
 from ..utils.warp import crop
 
 
 class TransformGOTURN(object):
 
-    def __init__(self, lambda_shift=5, lambda_scale=15,
-                 min_scale=-0.4, max_scale=0.4, context=2,
-                 out_size=227, label_scale_factor=10,
-                 mean_color=[104, 117, 123]):
-        self.lambda_shift = lambda_shift
-        self.lambda_scale = lambda_scale
-        self.min_scale = min_scale
-        self.max_scale = max_scale
-        self.context = context
-        self.out_size = out_size
-        self.label_scale_factor = label_scale_factor
-        self.mean_color = mean_color
+    def __init__(self, **kargs):
+        self.parse_args(**kargs)
+
+    def parse_args(self, **kargs):
+        default_args = {
+            'lambda_shift': 5,
+            'lambda_scale': 15,
+            'min_scale': -0.4,
+            'max_scale': 0.4,
+            'context': 2,
+            'out_size': 227,
+            'label_scale_factor': 10,
+            'mean_color': [104, 117, 123]}
+
+        for key, val in default_args.items():
+            if key in kargs:
+                setattr(self, key, kargs[key])
+            else:
+                setattr(self, key, val)
 
     def __call__(self, img_z, img_x, bndbox_z, bndbox_x):
         rand_bndbox_x = self._rand_shift(bndbox_x, img_x.size)

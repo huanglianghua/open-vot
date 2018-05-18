@@ -34,7 +34,8 @@ class TestTrackerSiamFC(unittest.TestCase):
     def test_siamfc_train_v1(self):
         tracker = TrackerSiamFC(branch='alexv1')
         transform = TransformSiamFC(
-            score_sz=17, stats_path=self.stats_path)
+            stats_path=self.stats_path, score_sz=17,
+            r_pos=16, total_stride=8)
 
         base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         dataset = Pairwise(base_dataset, transform)
@@ -53,7 +54,9 @@ class TestTrackerSiamFC(unittest.TestCase):
 
     def test_siamfc_track_v2(self):
         dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
-        tracker = TrackerSiamFC(branch='alexv2', net_path=self.net_v2)
+        tracker = TrackerSiamFC(
+            branch='alexv2', net_path=self.net_v2, z_lr=0.01,
+            response_up=8, scale_step=1.0816, window_influence=0.25)
 
         img_files, anno = random.choice(dataset)
         rects, speed = tracker.track(img_files, anno[0, :],
@@ -63,7 +66,8 @@ class TestTrackerSiamFC(unittest.TestCase):
     def test_siamfc_train_v2(self):
         tracker = TrackerSiamFC(branch='alexv2')
         transform = TransformSiamFC(
-            score_sz=33, stats_path=self.stats_path)
+            stats_path=self.stats_path, score_sz=33,
+            r_pos=8, total_stride=4)
 
         base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
         dataset = Pairwise(base_dataset, transform)

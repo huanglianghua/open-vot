@@ -10,6 +10,7 @@ import torchvision.transforms.functional as F
 from torch.optim.lr_scheduler import StepLR
 from PIL import Image
 
+from ..utils import dict2tuple
 from ..models import GOTURN
 from ..utils.viz import show_frame
 from ..utils.warp import crop
@@ -25,7 +26,7 @@ class TrackerGOTURN(object):
         self.setup_optimizer()
 
     def parse_args(self, **kargs):
-        default_args = {
+        self.cfg = {
             'context': 2,
             'scale_factor': 10,
             'input_dim': 227,
@@ -41,11 +42,9 @@ class TrackerGOTURN(object):
             'lr_mult_conv': 0,
             'batch_size': 50 // 2}
 
-        for key in default_args:
-            if key in kargs:
-                setattr(self, key, kargs[key])
-            else:
-                setattr(self, key, default_args[key])
+        for key, val in kargs.items():
+            self.cfg.update({key: val})
+        self.cfg = dict2tuple(self.cfg)
 
     def setup_model(self, net_path=None):
         self.model = GOTURN()
@@ -63,21 +62,21 @@ class TrackerGOTURN(object):
     def setup_optimizer(self):
         params = []
         for name, param in self.model.named_parameters():
-            lr = self.base_lr
-            weight_decay = self.weight_decay
+            lr = self.cfg.base_lr
+            weight_decay = self.cfg.weight_decay
             if 'conv' in name:
                 if 'weight' in name:
-                    lr *= self.lr_mult_conv
+                    lr *= self.cfg.lr_mult_conv
                     weight_decay *= 1
                 elif 'bias' in name:
-                    lr *= self.lr_mult_conv
+                    lr *= self.cfg.lr_mult_conv
                     weight_decay *= 0
             elif 'fc' in name:
                 if 'weight' in name:
-                    lr *= self.lr_mult_fc_weight
+                    lr *= self.cfg.lr_mult_fc_weight
                     weight_decay *= 1
                 elif 'bias' in name:
-                    lr *= self.lr_mult_fc_bias
+                    lr *= self.cfg.lr_mult_fc_bias
                     weight_decay *= 0
             params.append({
                 'params': param,
@@ -85,11 +84,11 @@ class TrackerGOTURN(object):
                 'weight_decay': weight_decay})
 
         self.optimizer = optim.SGD(
-            params, lr=self.base_lr,
-            momentum=self.momentum,
-            weight_decay=self.weight_decay)
+            params, lr=self.cfg.base_lr,
+            momentum=self.cfg.momentum,
+            weight_decay=self.cfg.weight_decay)
         self.scheduler = StepLR(
-            self.optimizer, self.lr_step_size, gamma=self.gamma)
+            self.optimizer, self.cfg.lr_step_size, gamma=self.cfg.gamma)
         self.criterion = nn.L1Loss().to(self.device)
 
     def init(self, image, init_rect):
@@ -104,7 +103,7 @@ class TrackerGOTURN(object):
 
         corners = self._locate_target(z, x)
         corners = corners.squeeze().cpu().numpy()
-        corners /= self.scale_factor
+        corners /= self.cfg.scale_factor
 
         corners = np.clip(corners, 0, 1)
         corners[0::2] *= roi[2]
@@ -171,11 +170,11 @@ class TrackerGOTURN(object):
     def _crop(self, image, bndbox, return_roi=False):
         center = bndbox[:2] + bndbox[2:] / 2
         center = np.clip(center, 0.0, image.size)
-        size = bndbox[2:] * self.context
+        size = bndbox[2:] * self.cfg.context
         size = np.clip(size, 1.0, image.size)
 
         patch = crop(image, center, size, padding=0,
-                     out_size=self.input_dim)
+                     out_size=self.cfg.input_dim)
 
         if return_roi:
             roi = np.concatenate([center - size / 2, size])
@@ -184,7 +183,7 @@ class TrackerGOTURN(object):
             return patch
 
     def _locate_target(self, z, x):
-        mean_color = torch.tensor(self.mean_color).float()
+        mean_color = torch.tensor(self.cfg.mean_color).float()
         mean_color = mean_color.view(3, 1, 1).to(self.device)
         z = 255.0 * F.to_tensor(z) - mean_color
         x = 255.0 * F.to_tensor(x) - mean_color

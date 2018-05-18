@@ -15,7 +15,7 @@ class TestLogger(unittest.TestCase):
 
     def tearDown(self):
         pass
-    
+
     def test_logger(self):
         for it in range(100):
             self.logger.add_scalar('data/unittest', 3, it)

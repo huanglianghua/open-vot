@@ -4,26 +4,36 @@ import numpy as np
 import torchvision.transforms.functional as F
 import torch
 
+from ..utils import dict2tuple
 from ..utils.ioutil import load_siamfc_stats
 from ..utils.warp import crop
 
 
 class TransformSiamFC(object):
 
-    def __init__(self, exemplar_sz=127, search_sz=255, score_sz=33,
-                 context=0.5, r_pos=8, r_neg=0, total_stride=4,
-                 ignore_label=-100, stats_path=None):
-        self.exemplar_sz = exemplar_sz
-        self.search_sz = search_sz
-        self.score_sz = score_sz
-        self.context = context
-        self.r_pos = r_pos
-        self.r_neg = r_neg
-        self.total_stride = total_stride
-        self.ignore_label = ignore_label
+    def __init__(self, stats_path=None, **kargs):
+        self.parse_args(**kargs)
         self.stats = None
         if stats_path:
             self.stats = load_siamfc_stats(stats_path)
+
+    def parse_args(self, **kargs):
+        # default branch is AlexNetV1
+        default_args = {
+            'exemplar_sz': 127,
+            'search_sz': 255,
+            'score_sz': 17,
+            'context': 0.5,
+            'r_pos': 16,
+            'r_neg': 0,
+            'total_stride': 8,
+            'ignore_label': -100}
+
+        for key, val in default_args.items():
+            if key in kargs:
+                setattr(self, key, kargs[key])
+            else:
+                setattr(self, key, val)
 
     def __call__(self, img_z, img_x, bndbox_z, bndbox_x):
         crop_z = self._crop(img_z, bndbox_z, self.exemplar_sz)

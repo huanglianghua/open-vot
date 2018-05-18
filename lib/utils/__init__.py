@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import torch.nn as nn
 import math
+from collections import namedtuple
 
 
 def initialize_weights(model):
@@ -18,3 +19,7 @@ def initialize_weights(model):
             n = m.weight.size(1)
             m.weight.data.normal_(0, 0.01)
             m.bias.data.zero_()
+
+
+def dict2tuple(dictionary):
+    return namedtuple('GenericDict', dictionary.keys())(**dictionary)

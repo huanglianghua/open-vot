@@ -14,6 +14,7 @@ class TestTransformSiamFC(unittest.TestCase):
 
     def setUp(self):
         self.vot_dir = 'data/vot2017'
+        self.stats_path = 'pretrained/siamfc/cfnet_ILSVRC2015.stats.mat'
         self.visualize = True
 
     def tearDown(self):
@@ -21,7 +22,7 @@ class TestTransformSiamFC(unittest.TestCase):
 
     def test_transform_siamfc(self):
         base_dataset = VOT(self.vot_dir, return_bndbox=True, download=True)
-        transform = TransformSiamFC()
+        transform = TransformSiamFC(stats_path=self.stats_path)
         dataset = Pairwise(
             base_dataset, transform=transform, subset='train')
         self.assertGreater(len(dataset), 0)
