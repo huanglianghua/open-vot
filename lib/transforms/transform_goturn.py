@@ -31,7 +31,15 @@ class TransformGOTURN(object):
             else:
                 setattr(self, key, val)
 
-    def __call__(self, img_z, img_x, bndbox_z, bndbox_x):
+    def __call__(self, *args):
+        assert len(args) in [2, 4]
+        if len(args) == 2:
+            img_z, img_x, bndbox_z, bndbox_x = \
+                args[0], args[1], args[0], args[1]
+        elif len(args) == 4:
+            img_z, img_x, bndbox_z, bndbox_x = args
+
+        # shift search area
         rand_bndbox_x = self._rand_shift(bndbox_x, img_x.size)
 
         # crop image regions

@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 import numpy as np
 import six
 import random
+from torch.utils.data import Dataset
+from PIL import Image
 
 
 class ImageNetVID(object):
@@ -91,15 +93,16 @@ class ImageNetVID(object):
         raise NotImplementedError()
 
 
-class ImageNetObject(object):
+class ImageNetObject(Dataset):
 
     def __init__(self, root_dir, return_rect=False,
-                 subset='train', download=False):
+                 subset='train', download=False, transform=None):
         super(ImageNetObject, self).__init__()
         self.root_dir = root_dir
         self.return_rect = return_rect
         if download:
             self._download(self.root_dir)
+        self.transform = transform
 
         if not self._check_integrity():
             raise Exception('Dataset not found or corrupted. ' +
@@ -151,7 +154,14 @@ class ImageNetObject(object):
         if self.return_rect:
             bndbox[2:] = bndbox[2:] - bndbox[:2] + 1
 
-        return img_file, bndbox
+        img = Image.open(img_file)
+        if img.mode == 'L':
+            img = img.convert('RGB')
+
+        if self.transform:
+            return self.transform(img, bndbox)
+        else:
+            return img_file, bndbox
 
     def __len__(self):
         return self.size
