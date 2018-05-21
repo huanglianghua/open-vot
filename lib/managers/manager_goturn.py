@@ -69,10 +69,10 @@ class ManagerGOTURN(object):
 
         # logging
         self.logger.add_text(tag, 'Overall Performance: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f} fps'.format(
-            mean_iou, prec, speed_fps), step)
-        self.logger.add_scalar(tag + '/iou_overall', mean_iou, step)
-        self.logger.add_scalar(tag + '/prec_overall', prec, step)
-        self.logger.add_scalar(tag + '/speed_overall', speed_fps, step)
+            avg_iou, avg_prec, avg_speed), step)
+        self.logger.add_scalar(tag + '/iou_overall', avg_iou, step)
+        self.logger.add_scalar(tag + '/prec_overall', avg_prec, step)
+        self.logger.add_scalar(tag + '/speed_overall', avg_speed, step)
 
         return avg_iou, avg_prec, avg_speed
 
