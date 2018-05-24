@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 
+import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image, ImageDraw
 
@@ -9,6 +10,9 @@ def show_frame(image, bndbox=None, fig_n=1, pause=0.001,
     global fig_dict
     if not 'fig_dict' in globals():
         fig_dict = {}
+
+    if isinstance(image, np.ndarray):
+        image = Image.fromarray(image)
 
     if bndbox is not None:
         image = image.copy()

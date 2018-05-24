@@ -129,3 +129,14 @@ def crop_tensor(image, center, size, padding='avg', out_size=None):
         patch += avg_chan
 
     return patch
+
+
+def resize_tensor(image, size):
+    if isinstance(size, numbers.Number):
+        size = torch.Size((1, 1, size, size))
+
+    theta = torch.FloatTensor([1, 0, 0, 0, 1, 0]).to(
+        image.device).view(-1, 2, 3).float()
+    grid = F.affine_grid(theta, size)
+
+    return F.grid_sample(image, grid)
