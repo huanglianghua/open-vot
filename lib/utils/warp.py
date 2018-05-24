@@ -49,7 +49,7 @@ def crop_pil(image, center, size, padding='avg', out_size=None):
 def pad_array(image, npad, padding='avg'):
     if npad == 0:
         return image
-    
+
     if padding == 'avg':
         avg_chan = image.mean(axis=(0, 1))
         image = cv2.copyMakeBorder(image, npad, npad, npad, npad,
@@ -66,7 +66,7 @@ def crop_array(image, center, size, padding='avg', out_size=None):
     size = np.array(size)
     corners = np.concatenate((center - size / 2, center + size / 2))
     corners = np.round(corners).astype(int)
-    
+
     pads = np.concatenate((-corners[:2], corners[2:] - image.shape[1::-1]))
     npad = max(0, int(pads.max()))
 
@@ -88,10 +88,10 @@ def encode_theta(center, size, angle, img_sz):
     device = center.device
     sx, sy = size / (img_sz - 1)
     tx, ty = (2 * center - img_sz + 1) / (img_sz - 1)
-    
+
     theta = torch.FloatTensor([
         sx, 0, tx, 0, sy, ty]).view(-1, 2, 3).to(device)
-    
+
     return theta
 
 

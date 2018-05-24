@@ -199,7 +199,7 @@ class TrackerSiamFC(Tracker):
 
         bndbox = torch.cat([self.center - self.target_sz / 2,
                             self.target_sz]).numpy()
-        
+
         return bndbox
 
     def step(self, batch, backward=True, update_lr=False):

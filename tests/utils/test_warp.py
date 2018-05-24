@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from PIL import Image
 
-from lib.utils.warp import pad_pil, crop_pil, pad_array, crop_array, crop_tensor
+from lib.utils.warp import pad_pil, crop_pil, pad_array, crop_array, crop_tensor, resize_tensor
 from lib.utils.viz import show_frame
 from lib.datasets import OTB
 
@@ -64,7 +64,7 @@ class TestWarp(unittest.TestCase):
             elif image.ndim == 3:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             image = pad_array(image, npad, padding=padding)
-            show_frame(Image.fromarray(image[:, :, ::-1]), fig_n=1)
+            show_frame(image[:, :, ::-1], fig_n=1)
 
     def test_crop_array(self):
         dataset = OTB(self.otb_dir, download=True)
@@ -84,7 +84,7 @@ class TestWarp(unittest.TestCase):
             center = bndbox[:2] + bndbox[2:] / 2
             patch = crop_array(image, center, bndbox[2:],
                                padding=padding, out_size=out_size)
-            show_frame(Image.fromarray(patch), fig_n=2, pause=0.1)
+            show_frame(patch, fig_n=2, pause=0.1)
 
     def test_crop_tensor(self):
         dataset = OTB(self.otb_dir, download=True)
@@ -100,13 +100,33 @@ class TestWarp(unittest.TestCase):
                 image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
             elif image.ndim == 3:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = torch.from_numpy(image).permute(2, 0, 1).unsqueeze(0).float()
+            image = torch.from_numpy(image).permute(
+                2, 0, 1).unsqueeze(0).float()
             bndbox = torch.from_numpy(anno[f, :]).float()
             center = bndbox[:2] + bndbox[2:] / 2
             patch = crop_tensor(image, center, bndbox[2:],
                                 padding=padding, out_size=out_size)
             patch = patch.squeeze().permute(1, 2, 0).numpy().astype(np.uint8)
-            show_frame(Image.fromarray(patch), fig_n=2, pause=0.1)
+            show_frame(patch, fig_n=1, pause=0.1)
+
+    def test_resize_tensor(self):
+        dataset = OTB(self.otb_dir, download=True)
+
+        out_size = random.choice([30, 100, 255])
+        print('[PyTorch-resize]:', out_size)
+
+        img_files, anno = random.choice(dataset)
+        for f, img_file in enumerate(img_files):
+            image = cv2.imread(img_file)
+            if image.ndim == 2:
+                image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+            elif image.ndim == 3:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = torch.from_numpy(image).permute(
+                2, 0, 1).unsqueeze(0).float()
+            image = resize_tensor(image, out_size)
+            image = image.squeeze().permute(1, 2, 0).numpy().astype(np.uint8)
+            show_frame(image, fig_n=2, pause=0.1)
 
 
 if __name__ == '__main__':
