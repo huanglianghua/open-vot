@@ -1,22 +1,19 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import torch
 import os
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import time
-import torchvision.transforms.functional as F
 from torch.optim.lr_scheduler import StepLR
-from PIL import Image
 
+from . import Tracker
 from ..utils import dict2tuple
 from ..models import GOTURN
-from ..utils.viz import show_frame
-from ..utils.warp import crop_pil
+from ..utils.ioutil import load_goturn_from_caffe
+from ..utils.warp import crop_tensor
 
 
-class TrackerGOTURN(object):
+class TrackerGOTURN(Tracker):
 
     def __init__(self, net_path=None, **kargs):
         self.parse_args(**kargs)
@@ -54,6 +51,10 @@ class TrackerGOTURN(object):
                 state_dict = torch.load(
                     net_path, map_location=lambda storage, loc: storage)
                 self.model.load_state_dict(state_dict)
+            elif ext == '.caffemodel':
+                proto_path = os.path.join(
+                    os.path.dirname(net_path), 'tracker.prototxt')
+                load_goturn_from_caffe(net_path, proto_path, self.model)
             else:
                 raise Exception('unsupport file extention')
 
@@ -92,58 +93,37 @@ class TrackerGOTURN(object):
         self.criterion = nn.L1Loss().to(self.device)
 
     def init(self, image, init_rect):
+        image = torch.from_numpy(image).to(
+            self.device).permute(2, 0, 1).unsqueeze(0).float()
+        init_rect = torch.from_numpy(init_rect).to(self.device).float()
         self.image_prev = image
         self.bndbox_prev = init_rect
 
     def update(self, image):
-        z = self._crop(
-            self.image_prev, self.bndbox_prev)
-        x, roi = self._crop(
-            image, self.bndbox_prev, return_roi=True)
+        image = torch.from_numpy(image).to(
+            self.device).permute(2, 0, 1).unsqueeze(0).float()
+
+        z, _ = self._crop(self.image_prev, self.bndbox_prev)
+        x, roi = self._crop(image, self.bndbox_prev)
 
         corners = self._locate_target(z, x)
-        corners = corners.squeeze().cpu().numpy()
-        corners /= self.cfg.scale_factor
+        corners = corners.squeeze() / self.cfg.scale_factor
+        corners = corners.clamp_(0, 1)
 
-        corners = np.clip(corners, 0, 1)
         corners[0::2] *= roi[2]
         corners[1::2] *= roi[3]
         corners[0::2] += roi[0]
         corners[1::2] += roi[1]
 
-        bndbox_curr = np.concatenate([
-            corners[:2], corners[2:] - corners[:2]])
-        bndbox_curr[2:] = np.clip(bndbox_curr[2:], 1.0, image.size)
+        bndbox_curr = torch.cat((corners[:2], corners[2:] - corners[:2]))
+        bndbox_curr[2].clamp_(1.0, image.size(-1))
+        bndbox_curr[3].clamp_(1.0, image.size(-2))
 
         # update
         self.image_prev = image
         self.bndbox_prev = bndbox_curr
 
-        return bndbox_curr
-
-    def track(self, img_files, init_rect, visualize=False):
-        frame_num = len(img_files)
-        bndboxes = np.zeros((frame_num, 4))
-        bndboxes[0, :] = init_rect
-
-        elapsed_time = 0
-        for f, img_file in enumerate(img_files):
-            image = Image.open(img_file)
-            if image.mode == 'L':
-                image = image.convert('RGB')
-
-            start_time = time.time()
-            if f == 0:
-                self.init(image, init_rect)
-            else:
-                bndboxes[f, :] = self.update(image)
-            elapsed_time += time.time() - start_time
-
-            if visualize:
-                show_frame(image, bndboxes[f, :], fig_n=1)
-        speed_fps = frame_num / elapsed_time
-
-        return bndboxes, speed_fps
+        return bndbox_curr.numpy()
 
     def step(self, batch, backward=True, update_lr=False):
         if backward:
@@ -169,25 +149,24 @@ class TrackerGOTURN(object):
 
     def _crop(self, image, bndbox, return_roi=False):
         center = bndbox[:2] + bndbox[2:] / 2
-        center = np.clip(center, 0.0, image.size)
+        center[0].clamp_(0.0, image.size(-1))
+        center[1].clamp_(0.0, image.size(-2))
+
         size = bndbox[2:] * self.cfg.context
-        size = np.clip(size, 1.0, image.size)
+        size[0].clamp_(1.0, image.size(-1))
+        size[1].clamp_(1.0, image.size(-2))
 
-        patch = crop_pil(image, center, size, padding=0,
-                         out_size=self.cfg.input_dim)
-
-        if return_roi:
-            roi = np.concatenate([center - size / 2, size])
-            return patch, roi
-        else:
-            return patch
+        patch = crop_tensor(image, center, size, padding=0,
+                            out_size=self.cfg.input_dim)
+        roi = torch.cat([center - size / 2, size])
+        
+        return patch, roi
 
     def _locate_target(self, z, x):
-        mean_color = torch.tensor(self.cfg.mean_color).float()
-        mean_color = mean_color.view(3, 1, 1).to(self.device)
-        z = 255.0 * F.to_tensor(z) - mean_color
-        x = 255.0 * F.to_tensor(x) - mean_color
-        z, x = z.unsqueeze(0), x.unsqueeze(0)
+        mean_color = torch.FloatTensor(self.cfg.mean_color)
+        mean_color = mean_color.to(self.device).view(1, 3, 1, 1)
+        z -= mean_color
+        x -= mean_color
         with torch.set_grad_enabled(False):
             self.model.eval()
             corners = self.model(z, x)

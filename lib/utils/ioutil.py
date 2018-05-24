@@ -143,3 +143,42 @@ def load_siamfc_stats(stats_path):
         rgb_variance_x)
 
     return stats
+
+
+def load_goturn_from_caffe(net_path, proto_path, model):
+    import caffe
+    caffe.set_mode_cpu()
+    net = caffe.Net(proto_path, net_path, caffe.TEST)
+
+    params = net.params
+    conv_branches = [model.branch_z, model.branch_x]
+
+    for i, branch in enumerate(conv_branches):
+        if i == 0:
+            param_names = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
+        else:
+            param_names = ['conv1_p', 'conv2_p', 'conv3_p', 'conv4_p', 'conv5_p']
+        
+        conv_layers = [
+            net.conv1[0],
+            net.conv2[0],
+            net.conv3[0],
+            net.conv4[0],
+            net.conv5[0]]
+        for l, conv in enumerate(conv_layers):
+            name = param_names[l]
+            conv.weight.data[:] = torch.from_numpy(params[name][0].data)
+            conv.bias.data[:] = torch.from_numpy(params[name][1].data)
+    
+    fc_layers = [
+        model.fc[0],
+        model.fc7[0],
+        model.fc7b[0],
+        model.fc8[0]]
+    params_names = ['fc6-new', 'fc7-new', 'fc7-newb', 'fc8-shapes']
+    for l, fc in enumerate(fc_layers):
+        name = param_names[l]
+        fc.weight.data[:] = torch.from_numpy(params[name][0].data)
+        fc.bias.data[:] = torch.from_numpy(params[name][1].data)
+    
+    return model
