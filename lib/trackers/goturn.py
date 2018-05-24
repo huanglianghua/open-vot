@@ -13,7 +13,7 @@ from PIL import Image
 from ..utils import dict2tuple
 from ..models import GOTURN
 from ..utils.viz import show_frame
-from ..utils.warp import crop
+from ..utils.warp import crop_pil
 
 
 class TrackerGOTURN(object):
@@ -173,8 +173,8 @@ class TrackerGOTURN(object):
         size = bndbox[2:] * self.cfg.context
         size = np.clip(size, 1.0, image.size)
 
-        patch = crop(image, center, size, padding=0,
-                     out_size=self.cfg.input_dim)
+        patch = crop_pil(image, center, size, padding=0,
+                         out_size=self.cfg.input_dim)
 
         if return_roi:
             roi = np.concatenate([center - size / 2, size])

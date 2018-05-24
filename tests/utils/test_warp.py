@@ -4,7 +4,7 @@ import unittest
 import random
 from PIL import Image
 
-from lib.utils.warp import pad, crop
+from lib.utils.warp import pad_pil, crop_pil
 from lib.utils.viz import show_frame
 from lib.datasets import OTB
 
@@ -17,7 +17,7 @@ class TestWarp(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_pad(self):
+    def test_pad_pil(self):
         dataset = OTB(self.otb_dir, download=True)
 
         npad = random.choice([0, 10, 50])
@@ -27,10 +27,10 @@ class TestWarp(unittest.TestCase):
         img_files, anno = random.choice(dataset)
         for f, img_file in enumerate(img_files):
             image = Image.open(img_file)
-            image = pad(image, npad, padding=padding)
+            image = pad_pil(image, npad, padding=padding)
             show_frame(image, fig_n=1)
 
-    def test_crop(self):
+    def test_crop_pil(self):
         dataset = OTB(self.otb_dir, download=True)
 
         padding = random.choice([None, 0, 'avg'])
@@ -42,8 +42,8 @@ class TestWarp(unittest.TestCase):
             image = Image.open(img_file)
             bndbox = anno[f, :]
             center = bndbox[:2] + bndbox[2:] / 2
-            patch = crop(image, center, bndbox[2:],
-                         padding=padding, out_size=out_size)
+            patch = crop_pil(image, center, bndbox[2:],
+                             padding=padding, out_size=out_size)
             show_frame(patch, fig_n=2, pause=0.1)
 
 

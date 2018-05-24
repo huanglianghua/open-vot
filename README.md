@@ -11,7 +11,7 @@ Open-VOT is a lightweight library of visual object tracking for research purpose
 Install [PyTorch](http://pytorch.org/) (version >= 0.4.0) and other dependencies:
 
 ```shell
-pip install h5py scipy matplotlib tensorboardX
+pip install torchvision opencv-python-contrib h5py scipy matplotlib tensorboardX
 ```
 
 ## Examples
@@ -30,6 +30,6 @@ python examples/goturn --phase test
 python examples/siamfc --phase train
 ```
 
-This command trains SiamFC tracker on the VOT2017 dataset. Note VOT2017 might be too tiny to train deep networks.
+The command trains SiamFC tracker on the ImageNet VID dataset, which can be found and downloaded at [Kaggle](https://www.kaggle.com/c/imagenet-object-detection-from-video-challenge/data).
 
-Please check out more examples in the `examples` folder. Or, alternatively, you could find out more concised examples in the `tests/trackers` folder.
+Please check out more examples in the `examples` folder. Or, alternatively, you could find out more concise examples in the `tests/trackers` folder.

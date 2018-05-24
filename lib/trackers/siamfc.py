@@ -15,7 +15,7 @@ from PIL import Image
 from ..utils import dict2tuple
 from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
-from ..utils.warp import crop
+from ..utils.warp import crop_pil
 from ..utils.viz import show_frame
 
 
@@ -152,8 +152,8 @@ class TrackerSiamFC(object):
         self.penalty = self.penalty / self.penalty.sum()
 
         # extract template features
-        crop_z = crop(image, self.center, self.z_sz,
-                      out_size=self.cfg.exemplar_sz)
+        crop_z = crop_pil(image, self.center, self.z_sz,
+                          out_size=self.cfg.exemplar_sz)
         self.z = self._extract_feature(crop_z)
 
     def update(self, image):
@@ -180,8 +180,8 @@ class TrackerSiamFC(object):
         # self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
         #     self.cfg.scale_lr * scaled_exemplar[scale_id]
         if self.cfg.z_lr > 0:
-            crop_z = crop(image, self.center, self.z_sz,
-                          out_size=self.cfg.exemplar_sz)
+            crop_z = crop_pil(image, self.center, self.z_sz,
+                              out_size=self.cfg.exemplar_sz)
             new_z = self._extract_feature(crop_z)
             self.z = (1 - self.cfg.z_lr) * self.z + \
                 self.cfg.z_lr * new_z
@@ -243,7 +243,7 @@ class TrackerSiamFC(object):
             sizes = np.tile(sizes, (2, 1)).T
 
         max_size = np.max(sizes, axis=0)
-        anchor_patch = crop(image, center, max_size, padding=padding)
+        anchor_patch = crop_pil(image, center, max_size, padding=padding)
 
         patches = []
         for i, size in enumerate(sizes):

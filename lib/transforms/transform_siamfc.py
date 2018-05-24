@@ -6,7 +6,7 @@ import torch
 
 from ..utils import dict2tuple
 from ..utils.ioutil import load_siamfc_stats
-from ..utils.warp import crop
+from ..utils.warp import crop_pil
 
 
 class TransformSiamFC(object):
@@ -73,7 +73,7 @@ class TransformSiamFC(object):
         patch_sz = out_size / self.exemplar_sz * \
             np.sqrt((size + context).prod())
 
-        return crop(image, center, patch_sz, out_size=out_size)
+        return crop_pil(image, center, patch_sz, out_size=out_size)
 
     def _create_labels(self):
         labels = self._create_logisticloss_labels()

@@ -5,15 +5,7 @@ import numpy as np
 from PIL import Image, ImageStat, ImageOps
 
 
-def to_corners(center, size):
-    size = np.array(size)
-    corners = np.concatenate((center - size / 2, center + size / 2))
-    corners = np.round(corners).astype(int)
-
-    return corners
-
-
-def pad(image, npad, padding='avg'):
+def pad_pil(image, npad, padding='avg'):
     if npad == 0:
         return image
 
@@ -28,13 +20,17 @@ def pad(image, npad, padding='avg'):
     return image
 
 
-def crop(image, center, size, padding='avg', out_size=None):
-    corners = to_corners(center, size)
+def crop_pil(image, center, size, padding='avg', out_size=None):
+    # convert bndbox to corners
+    size = np.array(size)
+    corners = np.concatenate((center - size / 2, center + size / 2))
+    corners = np.round(corners).astype(int)
+
     pads = np.concatenate((-corners[:2], corners[2:] - image.size))
     npad = max(0, int(pads.max()))
 
     if npad > 0:
-        image = pad(image, npad, padding=padding)
+        image = pad_pil(image, npad, padding=padding)
     corners = tuple((corners + npad).tolist())
     patch = image.crop(corners)
 

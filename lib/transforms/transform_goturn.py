@@ -6,7 +6,7 @@ import numpy as np
 import math
 
 from ..utils import dict2tuple
-from ..utils.warp import crop
+from ..utils.warp import crop_pil
 
 
 class TransformGOTURN(object):
@@ -93,8 +93,8 @@ class TransformGOTURN(object):
     def _crop(self, image, bndbox):
         center = bndbox[:2] + bndbox[2:] / 2
         size = bndbox[2:] * self.context
-        patch = crop(image, center, size, padding=0,
-                     out_size=self.out_size)
+        patch = crop_pil(image, center, size, padding=0,
+                         out_size=self.out_size)
 
         return patch
 
