@@ -42,8 +42,6 @@ class ManagerGOTURN(object):
 
         for s, (img_files, anno) in enumerate(dataset):
             seq_name = dataset.seq_names[s]
-            if not seq_name == 'ball2':
-                continue
 
             # tracking loop
             rects, speed_fps = tracker.track(
