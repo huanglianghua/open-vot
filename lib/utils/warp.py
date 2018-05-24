@@ -108,6 +108,7 @@ def decode_theta(theta, img_sz):
 
 
 def crop_tensor(image, center, size, padding='avg', out_size=None):
+    assert out_size is not None
     img_sz = torch.tensor(image.size()[:-3:-1]).to(image.device).float()
 
     # calculate padding
@@ -115,7 +116,7 @@ def crop_tensor(image, center, size, padding='avg', out_size=None):
     pads = torch.cat((-corners[:2], corners[2:] - img_sz))
     npad = max(0, pads.max().item())
 
-    if npad > 0:
+    if npad > 0 and padding == 'avg':
         avg_chan = image.view(3, -1).mean(dim=1).view(1, 3, 1, 1)
         image -= avg_chan
 
@@ -125,7 +126,7 @@ def crop_tensor(image, center, size, padding='avg', out_size=None):
     grid = F.affine_grid(theta, out_size)
     patch = F.grid_sample(image, grid)
 
-    if npad > 0:
+    if npad > 0 and padding == 'avg':
         patch += avg_chan
 
     return patch
