@@ -37,14 +37,14 @@ class Adjust2d(nn.Module):
         elif self.norm == 'linear':
             out = self.linear(out)
         elif self.norm == 'cosine':
-            n, k = z.size(0), z.size(-1)
+            n, k = out.size(0), z.size(-1)
             norm_z = torch.sqrt(
                 torch.pow(z, 2).view(n, -1).sum(1)).view(n, 1, 1, 1)
             norm_x = torch.sqrt(
                 k * k * F.avg_pool2d(torch.pow(x, 2), k, 1).sum(1, keepdim=True))
             out = out / (norm_z * norm_x + 1e-32)
         elif self.norm == 'euclidean':
-            n, k = z.size(0), z.size(-1)
+            n, k = out.size(0), z.size(-1)
             sqr_z = torch.pow(z, 2).view(n, -1).sum(1).view(n, 1, 1, 1)
             sqr_x = k * k * \
                 F.avg_pool2d(torch.pow(x, 2), k, 1).sum(1, keepdim=True)

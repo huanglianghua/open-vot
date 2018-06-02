@@ -96,6 +96,11 @@ class TrackerGOTURN(Tracker):
         image = torch.from_numpy(image).to(
             self.device).permute(2, 0, 1).unsqueeze(0).float()
         init_rect = torch.from_numpy(init_rect).to(self.device).float()
+
+        # initialize parameters
+        self.mean_color = torch.FloatTensor(self.cfg.mean_color)
+        self.mean_color = self.mean_color.to(self.device).view(1, 3, 1, 1)
+
         self.image_prev = image
         self.bndbox_prev = init_rect
 
@@ -123,7 +128,7 @@ class TrackerGOTURN(Tracker):
         self.image_prev = image
         self.bndbox_prev = bndbox_curr
 
-        return bndbox_curr.numpy()
+        return bndbox_curr.cpu().numpy()
 
     def step(self, batch, backward=True, update_lr=False):
         if backward:
@@ -159,14 +164,12 @@ class TrackerGOTURN(Tracker):
         patch = crop_tensor(image, center, size, padding=0,
                             out_size=self.cfg.input_dim)
         roi = torch.cat([center - size / 2, size])
-        
+
         return patch, roi
 
     def _locate_target(self, z, x):
-        mean_color = torch.FloatTensor(self.cfg.mean_color)
-        mean_color = mean_color.to(self.device).view(1, 3, 1, 1)
-        z -= mean_color
-        x -= mean_color
+        z -= self.mean_color
+        x -= self.mean_color
         with torch.set_grad_enabled(False):
             self.model.eval()
             corners = self.model(z, x)

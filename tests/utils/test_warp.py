@@ -106,7 +106,7 @@ class TestWarp(unittest.TestCase):
             center = bndbox[:2] + bndbox[2:] / 2
             patch = crop_tensor(image, center, bndbox[2:],
                                 padding=padding, out_size=out_size)
-            patch = patch.squeeze().permute(1, 2, 0).numpy().astype(np.uint8)
+            patch = patch.squeeze().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
             show_frame(patch, fig_n=1, pause=0.1)
 
     def test_resize_tensor(self):

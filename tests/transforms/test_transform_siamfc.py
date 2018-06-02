@@ -40,8 +40,8 @@ class TestTransformSiamFC(unittest.TestCase):
             crop_z, crop_x, labels, weights = random.choice(dataset)
             crop_z = F.to_pil_image(crop_z / 255.0)
             crop_x = F.to_pil_image(crop_x / 255.0)
-            labels = self._rescale(labels.cpu().squeeze().numpy())
-            weights = self._rescale(weights.cpu().squeeze().numpy())
+            labels = self._rescale(labels.squeeze().cpu().numpy())
+            weights = self._rescale(weights.squeeze().cpu().numpy())
 
             bndbox_z = np.array([31, 31, 64, 64])
             bndbox_x = np.array([95, 95, 64, 64])

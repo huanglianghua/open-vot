@@ -157,8 +157,9 @@ def load_goturn_from_caffe(net_path, proto_path, model):
         if i == 0:
             param_names = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5']
         else:
-            param_names = ['conv1_p', 'conv2_p', 'conv3_p', 'conv4_p', 'conv5_p']
-        
+            param_names = ['conv1_p', 'conv2_p',
+                           'conv3_p', 'conv4_p', 'conv5_p']
+
         conv_layers = [
             net.conv1[0],
             net.conv2[0],
@@ -169,7 +170,7 @@ def load_goturn_from_caffe(net_path, proto_path, model):
             name = param_names[l]
             conv.weight.data[:] = torch.from_numpy(params[name][0].data)
             conv.bias.data[:] = torch.from_numpy(params[name][1].data)
-    
+
     fc_layers = [
         model.fc[0],
         model.fc7[0],
@@ -180,5 +181,5 @@ def load_goturn_from_caffe(net_path, proto_path, model):
         name = param_names[l]
         fc.weight.data[:] = torch.from_numpy(params[name][0].data)
         fc.bias.data[:] = torch.from_numpy(params[name][1].data)
-    
+
     return model

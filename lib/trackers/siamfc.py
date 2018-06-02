@@ -198,7 +198,7 @@ class TrackerSiamFC(Tracker):
             self.cfg.scale_lr * scaled_exemplar[scale_id]
 
         bndbox = torch.cat([self.center - self.target_sz / 2,
-                            self.target_sz]).numpy()
+                            self.target_sz]).cpu().numpy()
 
         return bndbox
 
@@ -245,7 +245,7 @@ class TrackerSiamFC(Tracker):
         scores = F.conv2d(x, z)
         with torch.set_grad_enabled(False):
             self.norm.eval()
-            scores = self.norm(scores, z, x)
+            scores = self.norm(scores)
 
         scores[:self.cfg.scale_num // 2] *= self.cfg.scale_penalty
         scores[self.cfg.scale_num // 2 + 1:] *= self.cfg.scale_penalty
@@ -262,10 +262,10 @@ class TrackerSiamFC(Tracker):
 
     def _locate_target(self, center, score, final_score_sz,
                        total_stride, search_sz, response_up, x_sz):
-        max_ind = score.argmax().item()
-        pos = torch.tensor([
+        max_ind = score.argmax()
+        pos = torch.stack([
             max_ind % self.final_score_sz,
-            max_ind // self.final_score_sz]).to(self.device).float()
+            max_ind / self.final_score_sz]).float()
         half = (final_score_sz - 1) / 2
 
         disp_in_area = pos - half
