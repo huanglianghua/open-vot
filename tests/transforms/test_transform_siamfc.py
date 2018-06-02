@@ -24,7 +24,7 @@ class TestTransformSiamFC(unittest.TestCase):
         base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
         transform = TransformSiamFC(stats_path=self.stats_path)
         dataset = Pairwise(
-            base_dataset, transform=transform, subset='train')
+            base_dataset, transform=transform, pairs_per_video=1, subset='train')
         self.assertGreater(len(dataset), 0)
 
         for crop_z, crop_x, labels, weights in dataset:

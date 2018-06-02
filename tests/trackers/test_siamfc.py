@@ -38,7 +38,7 @@ class TestTrackerSiamFC(unittest.TestCase):
             r_pos=16, total_stride=8)
 
         base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
-        dataset = Pairwise(base_dataset, transform)
+        dataset = Pairwise(base_dataset, transform, pairs_per_video=1)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
         # training loop
@@ -70,7 +70,7 @@ class TestTrackerSiamFC(unittest.TestCase):
             r_pos=8, total_stride=4)
 
         base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
-        dataset = Pairwise(base_dataset, transform)
+        dataset = Pairwise(base_dataset, transform, pairs_per_video=1)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
         # training loop

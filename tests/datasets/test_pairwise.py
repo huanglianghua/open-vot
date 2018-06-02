@@ -24,8 +24,8 @@ class TestPairwise(unittest.TestCase):
         return_index = random.choice([True, False])
         rand_choice = random.choice([True, False])
         dataset = Pairwise(
-            base_dataset, frame_range=frame_range, causal=causal,
-            subset=subset, return_index=return_index,
+            base_dataset, pairs_per_video=1, frame_range=frame_range,
+            causal=causal, subset=subset, return_index=return_index,
             rand_choice=rand_choice)
         self.assertGreater(len(dataset), 0)
 

@@ -24,7 +24,8 @@ class TestTransformGOTURN(unittest.TestCase):
         base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
         transform = TransformGOTURN()
         dataset = Pairwise(
-            base_dataset, transform, frame_range=1, causal=True)
+            base_dataset, transform, pairs_per_video=1,
+            frame_range=1, causal=True)
         self.assertGreater(len(dataset), 0)
 
         for crop_z, crop_x, labels in dataset:

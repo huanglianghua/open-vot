@@ -33,7 +33,8 @@ class TestTrackerGOTURN(unittest.TestCase):
 
         base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
         dataset = Pairwise(
-            base_dataset, transform, frame_range=1, causal=True)
+            base_dataset, transform, pairs_per_video=1,
+            frame_range=1, causal=True)
         dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
         # training loop

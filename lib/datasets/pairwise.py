@@ -7,14 +7,15 @@ from PIL import Image
 
 class Pairwise(Dataset):
 
-    def __init__(self, base_dataset, transform=None,
+    def __init__(self, base_dataset, transform=None, pairs_per_video=25,
                  frame_range=100, causal=False, return_index=False,
-                 rand_choice=False, subset='train', train_ratio=0.95):
+                 rand_choice=True, subset='train', train_ratio=0.95):
         super(Pairwise, self).__init__()
         assert subset in ['train', 'val']
 
         self.base_dataset = base_dataset
         self.transform = transform
+        self.pairs_per_video = pairs_per_video
         self.frame_range = frame_range
         self.causal = causal
         self.return_index = return_index
@@ -25,6 +26,7 @@ class Pairwise(Dataset):
         split = np.clip(split, 10, n - 10)
         if subset == 'train':
             self.indices = np.arange(0, split, dtype=int)
+            self.indices = np.tile(self.indices, pairs_per_video)
         elif subset == 'val':
             self.indices = np.arange(split, n, dtype=int)
 
