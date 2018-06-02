@@ -43,6 +43,7 @@ class Adjust2d(nn.Module):
             norm_x = torch.sqrt(
                 k * k * F.avg_pool2d(torch.pow(x, 2), k, 1).sum(1, keepdim=True))
             out = out / (norm_z * norm_x + 1e-32)
+            out = (out + 1) / 2
         elif self.norm == 'euclidean':
             n, k = out.size(0), z.size(-1)
             sqr_z = torch.pow(z, 2).view(n, -1).sum(1).view(n, 1, 1, 1)
