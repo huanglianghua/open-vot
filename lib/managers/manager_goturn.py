@@ -89,8 +89,8 @@ class ManagerGOTURN(object):
 
         # training dataset
         seq_dataset_train = Pairwise(
-            ImageNetVID(vid_dir, return_rect=True), pairs_per_video=1,
-            transform, frame_range=1, causal=True, subset='train')
+            ImageNetVID(vid_dir, return_rect=True), transform,
+            pairs_per_video=1, frame_range=1, causal=True, subset='train')
         seq_loader_train = DataLoader(
             seq_dataset_train, batch_size=self.cfg.batch_size, shuffle=True,
             pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
@@ -103,8 +103,8 @@ class ManagerGOTURN(object):
 
         # validation dataset
         seq_dataset_val = Pairwise(
-            ImageNetVID(vid_dir, return_rect=True), pairs_per_video=1,
-            transform, frame_range=1, causal=True, subset='val')
+            ImageNetVID(vid_dir, return_rect=True), transform,
+            pairs_per_video=1, frame_range=1, causal=True, subset='val')
         seq_loader_val = DataLoader(
             seq_dataset_val, batch_size=self.cfg.batch_size, shuffle=True,
             pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
