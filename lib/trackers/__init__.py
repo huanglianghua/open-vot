@@ -48,3 +48,4 @@ class Tracker(object):
 from .siamfc import TrackerSiamFC
 from .goturn import TrackerGOTURN
 from .csk import TrackerCSK
+from .kcf import TrackerKCF
