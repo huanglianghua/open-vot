@@ -9,8 +9,8 @@ from ..utils.viz import show_frame
 
 class Tracker(object):
 
-    def __init__(self):
-        pass
+    def __init__(self, name):
+        self.name = name
 
     def init(self, image, init_rect):
         raise NotImplementedError()

@@ -62,6 +62,7 @@ def subwindow(img, window, borderType=cv2.BORDER_CONSTANT):
 class TrackerKCF(Tracker):
 
     def __init__(self, fixed_window=True, multiscale=True):
+        super(TrackerKCF, self).__init__('KCF')
         self.lambdar = 0.0001   # regularization
         self.padding = 2.5   # extra area surrounding the target
         self.output_sigma_factor = 0.125   # bandwidth of gaussian target

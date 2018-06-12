@@ -11,6 +11,7 @@ from ..utils.complex import real, fft, ifft, complex_mul, complex_div, circ_shif
 class TrackerCSK(Tracker):
 
     def __init__(self, **kargs):
+        super(TrackerCSK, self).__init__('CSK')
         self.parse_args(**kargs)
 
     def parse_args(self, **kargs):

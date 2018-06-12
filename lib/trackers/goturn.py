@@ -16,6 +16,7 @@ from ..utils.warp import crop_tensor
 class TrackerGOTURN(Tracker):
 
     def __init__(self, net_path=None, **kargs):
+        super(TrackerGOTURN, self).__init__('GOTURN')
         self.parse_args(**kargs)
         self.cuda = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if self.cuda else 'cpu')

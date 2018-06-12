@@ -27,6 +27,7 @@ class BCEWeightedLoss(nn.Module):
 class TrackerSiamFC(Tracker):
 
     def __init__(self, branch='alexv1', net_path=None, **kargs):
+        super(TrackerSiamFC, self).__init__('SiamFC')
         self.parse_args(**kargs)
         self.cuda = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if self.cuda else 'cpu')
