@@ -123,7 +123,7 @@ def func4(mappmap, p, sizeX, sizeY, pp, yp, xp, nx, ny):
 
 
 
-def getFeatureMaps(image, k, mapp):
+def get_feature_maps(image, k, mapp):
 	kernel = np.array([[-1.,  0., 1.]], np.float32)
 
 	height = image.shape[0]
@@ -189,7 +189,7 @@ def getFeatureMaps(image, k, mapp):
 	return mapp
 
 
-def normalizeAndTruncate(mapp, alfa):
+def normalize_and_truncate(mapp, alfa):
 	sizeX = mapp['sizeX']
 	sizeY = mapp['sizeY']
 
@@ -255,7 +255,7 @@ def normalizeAndTruncate(mapp, alfa):
 	return mapp
 
 
-def PCAFeatureMaps(mapp):
+def pca_feature_maps(mapp):
 	sizeX = mapp['sizeX']
 	sizeY = mapp['sizeY']
 
@@ -308,3 +308,15 @@ def PCAFeatureMaps(mapp):
 	mapp['map'] = newData
 
 	return mapp
+
+
+def fast_hog(image, k):
+	mapp = {'sizeX': 0, 'sizeY': 0, 'numFeatures': 0, 'map': 0}
+	mapp = get_feature_maps(image, k, mapp)
+	mapp = normalize_and_truncate(mapp, 0.2)
+	mapp = pca_feature_maps(mapp)
+	feature = mapp['map']
+	feature = feature.reshape((
+		mapp['sizeY'], mapp['sizeX'], mapp['numFeatures']))
+	
+	return feature

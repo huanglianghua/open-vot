@@ -5,8 +5,8 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..descriptors import fhog
 from ..utils.complex import real, fft, ifft, complex_mul, complex_div, circ_shift
+from ..descriptors.fhog import fast_hog
 
 
 class TrackerKCF(Tracker):
@@ -18,7 +18,7 @@ class TrackerKCF(Tracker):
     def parse_args(self, **kargs):
         self.cfg = {
             'lambda_': 1e-4,
-            'padding': 2.5,
+            'padding': 1.5,
             'output_sigma_factor': 0.125,
             'interp_factor': 0.012,
             'sigma': 0.6,
@@ -29,128 +29,72 @@ class TrackerKCF(Tracker):
         self.cfg = dict2tuple(self.cfg)
 
     def init(self, image, init_rect):
-        self._roi = [float(t) for t in init_rect]
-        assert(init_rect[2] > 0 and init_rect[3] > 0)
-        self._tmpl = self.extract_feature(image, 1)
-        self._prob = self.create_labels(self.feat_sz[0], self.feat_sz[1])
-        self._alphaf = np.zeros(
-            (self.feat_sz[0], self.feat_sz[1], 2), np.float32)
-        self.train(self._tmpl, 1.0)
+        # initialize parameters
+        self.t_center = init_rect[:2] + init_rect[2:] / 2
+        self.t_sz = init_rect[2:]
+        mod = self.cfg.cell_size * 2
+        self.padded_sz = self.t_sz * (1 + self.cfg.padding)
+        self.padded_sz = self.padded_sz.astype(int) // mod * mod + mod
 
-    def update(self, image):
-        if(self._roi[0]+self._roi[2] <= 0):
-            self._roi[0] = -self._roi[2] + 1
-        if(self._roi[1]+self._roi[3] <= 0):
-            self._roi[1] = -self._roi[2] + 1
-        if(self._roi[0] >= image.shape[1]-1):
-            self._roi[0] = image.shape[1] - 2
-        if(self._roi[1] >= image.shape[0]-1):
-            self._roi[1] = image.shape[0] - 2
-
-        cx = self._roi[0] + self._roi[2]/2.
-        cy = self._roi[1] + self._roi[3]/2.
-
-        loc, peak_value = self.locate_target(
-            self._tmpl, self.extract_feature(image, 0))
-
-        self._roi[0] = cx - self._roi[2]/2.0 + \
-            loc[0]*self.cfg.cell_size
-        self._roi[1] = cy - self._roi[3]/2.0 + \
-            loc[1]*self.cfg.cell_size
-
-        if(self._roi[0] >= image.shape[1]-1):
-            self._roi[0] = image.shape[1] - 1
-        if(self._roi[1] >= image.shape[0]-1):
-            self._roi[1] = image.shape[0] - 1
-        if(self._roi[0]+self._roi[2] <= 0):
-            self._roi[0] = -self._roi[2] + 2
-        if(self._roi[1]+self._roi[3] <= 0):
-            self._roi[1] = -self._roi[3] + 2
-        assert(self._roi[2] > 0 and self._roi[3] > 0)
-
-        x = self.extract_feature(image, 0)
-        self.train(x, self.cfg.interp_factor)
-
-        return self._roi
-
-    def subpixel_peak(self, left, center, right):
-        divisor = 2*center - right - left  # float
-        return (0 if abs(divisor) < 1e-3 else 0.5*(right-left)/divisor)
-
-    def create_hanning(self):
-        hann2d = np.outer(
+        # get feature size and initialize hanning window
+        self.z = self._crop(
+            image, self.t_center, self.padded_sz)
+        self.z = fast_hog(self.z, self.cfg.cell_size)
+        self.feat_sz = self.z.shape
+        self.hann_window = np.outer(
             np.hanning(self.feat_sz[0]),
             np.hanning(self.feat_sz[1])).astype(np.float32)
-        self.hann = hann2d[:, :, np.newaxis]
+        self.hann_window = self.hann_window[:, :, np.newaxis]
+        self.z *= self.hann_window
 
-    def create_labels(self, sizey, sizex):
-        syh, sxh = sizey//2, sizex//2
-        output_sigma = np.sqrt(sizex*sizey) / \
-            self.cfg.padding * self.cfg.output_sigma_factor
-        mult = -0.5 / (output_sigma*output_sigma)
-        y, x = np.ogrid[0:sizey, 0:sizex]
-        y, x = (y-syh)**2, (x-sxh)**2
-        res = np.exp(mult * (y+x))
-        return fft(res)
+        # create gaussian labels
+        output_sigma = self.cfg.output_sigma_factor * \
+            np.sqrt(np.prod(self.feat_sz[:2])) / (1 + self.cfg.padding)
+        rs, cs = np.ogrid[:self.feat_sz[0], :self.feat_sz[1]]
+        rs, cs = rs - self.feat_sz[0] // 2, cs - self.feat_sz[1] // 2
+        y = np.exp(-0.5 / output_sigma ** 2 * (rs ** 2 + cs ** 2))
+        self.yf = fft(y)
 
-    def gaussian_correlation(self, x1, x2):
-        c = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
-        for i in range(self.feat_sz[2]):
-            caux = cv2.mulSpectrums(fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
-            caux = real(ifft(caux))
-            c += caux
-        c = circ_shift(c)
+        # train classifier
+        k = self._gaussian_correlation(self.z, self.z)
+        self.alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
 
-        d = (np.sum(x1*x1) + np.sum(x2*x2) - 2.0*c) / \
-            (self.feat_sz[0]*self.feat_sz[1]*self.feat_sz[2])
-        d = d * (d >= 0)
-        d = np.exp(-d / (self.cfg.sigma*self.cfg.sigma))
+    def update(self, image):
+        self.t_center = np.clip(
+            self.t_center, -self.t_sz / 2 + 1,
+            image.shape[1::-1] + self.t_sz / 2 - 2)
 
-        return d
+        # locate target
+        x = self._crop(image, self.t_center, self.padded_sz)
+        x = self.hann_window * fast_hog(x, self.cfg.cell_size)
+        k = self._gaussian_correlation(x, self.z)
+        score = real(ifft(complex_mul(self.alphaf, fft(k))))
+        offset = self._locate_target(score)
+        self.t_center += offset * self.cfg.cell_size
+        # limit the estimated bounding box to be overlapped with the image
+        self.t_center = np.clip(
+            self.t_center, -self.t_sz / 2 + 2,
+            image.shape[1::-1] + self.t_sz / 2 - 1)
 
-    def extract_feature(self, image, inithann):
-        extracted_roi = [0, 0, 0, 0]  # [int,int,int,int]
-        cx = self._roi[0] + self._roi[2]/2  # float
-        cy = self._roi[1] + self._roi[3]/2  # float
+        # update model
+        new_z = self._crop(image, self.t_center, self.padded_sz)
+        new_z = self.hann_window * fast_hog(new_z, self.cfg.cell_size)
+        k = self._gaussian_correlation(new_z, new_z)
+        new_alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
+        self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
+            self.cfg.interp_factor * new_alphaf
+        self.z = (1 - self.cfg.interp_factor) * self.z + \
+            self.cfg.interp_factor * new_z
 
-        if(inithann):
-            padded_w = self._roi[2] * self.cfg.padding
-            padded_h = self._roi[3] * self.cfg.padding
-            mod = 2 * self.cfg.cell_size
-            self._tmpl_sz = [
-                int(padded_w) // mod * mod + mod,
-                int(padded_h) // mod * mod + mod]
+        bndbox = np.concatenate([
+            self.t_center - self.t_sz / 2, self.t_sz])
 
-        extracted_roi[2] = int(self._tmpl_sz[0])
-        extracted_roi[3] = int(self._tmpl_sz[1])
-        extracted_roi[0] = int(cx - extracted_roi[2]/2)
-        extracted_roi[1] = int(cy - extracted_roi[3]/2)
+        return bndbox
 
-        # z = subwindow(image, extracted_roi, cv2.BORDER_REPLICATE)
-        z = self._crop(image, extracted_roi)
-        if(z.shape[1] != self._tmpl_sz[0] or z.shape[0] != self._tmpl_sz[1]):
-            z = cv2.resize(z, tuple(self._tmpl_sz))
-
-        mapp = {'sizeX': 0, 'sizeY': 0, 'numFeatures': 0, 'map': 0}
-        mapp = fhog.getFeatureMaps(z, self.cfg.cell_size, mapp)
-        mapp = fhog.normalizeAndTruncate(mapp, 0.2)
-        mapp = fhog.PCAFeatureMaps(mapp)
-        self.feat_sz = [mapp['sizeY'], mapp['sizeX'], mapp['numFeatures']]
-        feature = mapp['map'].reshape(
-            (self.feat_sz[0], self.feat_sz[1], self.feat_sz[2]))
-
-        if(inithann):
-            self.create_hanning()  # create_hanning need size_patch
-
-        feature = self.hann * feature
-        
-        return feature
-
-    def _crop(self, image, rect):
-        rect = np.array(rect, dtype=int)
+    def _crop(self, image, center, size):
         corners = np.zeros(4, dtype=int)
-        corners[:2] = rect[:2]
-        corners[2:] = rect[:2] + rect[2:]
+        corners[:2] = np.floor(center - size / 2).astype(int)
+        corners[2:] = corners[:2] + size
         pads = np.concatenate(
             (-corners[:2], corners[2:] - image.shape[1::-1]))
         pads = np.maximum(0, pads)
@@ -169,29 +113,41 @@ class TrackerKCF(Tracker):
 
         return patch
 
-    def locate_target(self, z, x):
-        k = self.gaussian_correlation(x, z)
-        res = real(ifft(complex_mul(self._alphaf, fft(k))))
+    def _gaussian_correlation(self, x1, x2):
+        xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
+        for i in range(self.feat_sz[2]):
+            xcorr_ = cv2.mulSpectrums(fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft(xcorr_))
+            xcorr += xcorr_
+        xcorr = circ_shift(xcorr)
 
-        _, pv, _, pi = cv2.minMaxLoc(res)   # pv:float  pi:tuple of int
-        p = [float(pi[0]), float(pi[1])]   # cv::Point2f, [x,y]  #[float,float]
+        d = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / \
+            (self.feat_sz[0]*self.feat_sz[1]*self.feat_sz[2])
+        d = d * (d >= 0)
+        d = np.exp(-d / (self.cfg.sigma*self.cfg.sigma))
 
-        if(pi[0] > 0 and pi[0] < res.shape[1]-1):
-            p[0] += self.subpixel_peak(res[pi[1], pi[0]-1],
-                                       pv, res[pi[1], pi[0]+1])
-        if(pi[1] > 0 and pi[1] < res.shape[0]-1):
-            p[1] += self.subpixel_peak(res[pi[1]-1, pi[0]],
-                                       pv, res[pi[1]+1, pi[0]])
+        return d
 
-        p[0] -= res.shape[1] / 2.
-        p[1] -= res.shape[0] / 2.
+    def _locate_target(self, score):
+        def subpixel_peak(left, center, right):
+            divisor = 2 * center - left - right
+            if abs(divisor) < 1e-3:
+                return 0
+            return 0.5 * (right - left) / divisor
 
-        return p, pv
+        _, _, _, max_loc = cv2.minMaxLoc(score)
+        loc = np.float32(max_loc)
 
-    def train(self, x, train_interp_factor):
-        k = self.gaussian_correlation(x, x)
-        alphaf = complex_div(self._prob, fft(k)+self.cfg.lambda_)
+        if max_loc[0] in range(1, score.shape[1] - 1):
+            loc[0] += subpixel_peak(
+                score[max_loc[1], max_loc[0] - 1],
+                score[max_loc[1], max_loc[0]],
+                score[max_loc[1], max_loc[0] + 1])
+        if max_loc[1] in range(1, score.shape[0] - 1):
+            loc[1] += subpixel_peak(
+                score[max_loc[1] - 1, max_loc[0]],
+                score[max_loc[1], max_loc[0]],
+                score[max_loc[1] + 1, max_loc[0]])
+        offset = loc - np.float32(score.shape[1::-1]) / 2
 
-        self._tmpl = (1-train_interp_factor)*self._tmpl + train_interp_factor*x
-        self._alphaf = (1-train_interp_factor)*self._alphaf + \
-            train_interp_factor*alphaf
+        return offset
