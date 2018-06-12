@@ -116,15 +116,15 @@ class TrackerKCF(Tracker):
     def _gaussian_correlation(self, x1, x2):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
         for i in range(self.feat_sz[2]):
-            xcorr_ = cv2.mulSpectrums(fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = cv2.mulSpectrums(
+                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
             xcorr_ = real(ifft(xcorr_))
             xcorr += xcorr_
         xcorr = circ_shift(xcorr)
 
-        d = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / \
-            (self.feat_sz[0]*self.feat_sz[1]*self.feat_sz[2])
+        d = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / x1.size
         d = d * (d >= 0)
-        d = np.exp(-d / (self.cfg.sigma*self.cfg.sigma))
+        d = np.exp(-d / self.cfg.sigma ** 2)
 
         return d
 
