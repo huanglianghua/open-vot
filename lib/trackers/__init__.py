@@ -50,3 +50,4 @@ from .goturn import TrackerGOTURN
 from .csk import TrackerCSK
 from .kcf import TrackerKCF
 from .mosse import TrackerMOSSE
+from .dsst import TrackerDSST
