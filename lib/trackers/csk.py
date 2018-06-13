@@ -50,7 +50,7 @@ class TrackerCSK(Tracker):
             np.hanning(self.padded_sz[1]),
             np.hanning(self.padded_sz[0])).astype(np.float32)
 
-        # crop padded target and train the classifier
+        # crop padded target and train classifier
         if image.ndim == 3:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         if self.resize_image:
