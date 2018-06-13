@@ -30,6 +30,10 @@ class TrackerKCF(Tracker):
 
     def init(self, image, init_rect):
         # initialize parameters
+        self.resize_image = False
+        if np.sqrt(init_rect[2:].prod()) > 100:
+            self.resize_image = True
+            init_rect = init_rect / 2
         self.t_center = init_rect[:2] + init_rect[2:] / 2
         self.t_sz = init_rect[2:]
         mod = self.cfg.cell_size * 2
@@ -37,6 +41,11 @@ class TrackerKCF(Tracker):
         self.padded_sz = self.padded_sz.astype(int) // mod * mod + mod
 
         # get feature size and initialize hanning window
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        if self.resize_image:
+            size = (int(image.shape[1] / 2), int(image.shape[0] / 2))
+            image = cv2.resize(image, size)
         self.z = self._crop(
             image, self.t_center, self.padded_sz)
         self.z = fast_hog(self.z, self.cfg.cell_size)
@@ -60,9 +69,11 @@ class TrackerKCF(Tracker):
         self.alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
 
     def update(self, image):
-        self.t_center = np.clip(
-            self.t_center, -self.t_sz / 2 + 1,
-            image.shape[1::-1] + self.t_sz / 2 - 2)
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        if self.resize_image:
+            size = (int(image.shape[1] / 2), int(image.shape[0] / 2))
+            image = cv2.resize(image, size)
 
         # locate target
         x = self._crop(image, self.t_center, self.padded_sz)
@@ -88,6 +99,8 @@ class TrackerKCF(Tracker):
 
         bndbox = np.concatenate([
             self.t_center - self.t_sz / 2, self.t_sz])
+        if self.resize_image:
+            bndbox = bndbox * 2
 
         return bndbox
 
