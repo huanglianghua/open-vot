@@ -161,9 +161,9 @@ class TrackerKCF(Tracker):
             xcorr += xcorr_
         xcorr = circ_shift(xcorr)
 
-        d = (xcorr / x1.size + a) ** b
+        out = (xcorr / x1.size + a) ** b
 
-        return d
+        return out
 
     def _gaussian_correlation(self, x1, x2, sigma):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
@@ -174,11 +174,11 @@ class TrackerKCF(Tracker):
             xcorr += xcorr_
         xcorr = circ_shift(xcorr)
 
-        d = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / x1.size
-        d = d * (d >= 0)
-        d = np.exp(-d / self.cfg.sigma ** 2)
+        out = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / x1.size
+        out[out < 0] = 0
+        out = np.exp(-out / self.cfg.sigma ** 2)
 
-        return d
+        return out
 
     def _locate_target(self, score):
         def subpixel_peak(left, center, right):
@@ -208,6 +208,5 @@ class TrackerKCF(Tracker):
 class TrackerDCF(TrackerKCF):
 
     def __init__(self, **kargs):
-        kargs.update({
-            'kernel_type': 'linear'})
+        kargs.update({'kernel_type': 'linear'})
         super(TrackerDCF, self).__init__(**kargs)
