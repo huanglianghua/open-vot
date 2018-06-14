@@ -2,7 +2,7 @@
 
 Open-VOT is a lightweight library of visual object tracking for research purpose. It aims to provide a uniform interface for different datasets, a full set of models and evaluation metrics, as well as examples to reproduce (near) state-of-the-art results.
 
-*Currently 5 trackers are implemented: [SiamFC](http://www.robots.ox.ac.uk/~luca/siamese-fc.html), [GOTURN](http://davheld.github.io/GOTURN/GOTURN.html), [CSK](http://www.robots.ox.ac.uk/~joao/circulant/index.html), [KCF](http://www.robots.ox.ac.uk/~joao/circulant/index.html) and [MOSSE](http://www.cs.colostate.edu/~vision/publications/TSMCA-Lui2010.pdf).*
+*Currently 6 trackers are implemented: [SiamFC](http://www.robots.ox.ac.uk/~luca/siamese-fc.html), [GOTURN](http://davheld.github.io/GOTURN/GOTURN.html), [CSK](http://www.robots.ox.ac.uk/~joao/circulant/index.html), [KCF](http://www.robots.ox.ac.uk/~joao/circulant/index.html), [DCF](http://www.robots.ox.ac.uk/~joao/circulant/index.html) and [MOSSE](http://www.cs.colostate.edu/~vision/publications/TSMCA-Lui2010.pdf).*
 
 ## Installation
 

@@ -14,6 +14,7 @@ class TrackerKCF(Tracker):
     def __init__(self, **kargs):
         super(TrackerKCF, self).__init__('KCF')
         self.parse_args(**kargs)
+        self._correlation = self.setup_kernel(self.cfg.kernel_type)
 
     def parse_args(self, **kargs):
         self.cfg = {
@@ -22,11 +23,25 @@ class TrackerKCF(Tracker):
             'output_sigma_factor': 0.125,
             'interp_factor': 0.012,
             'sigma': 0.6,
-            'cell_size': 4}
+            'poly_a': 1,
+            'poly_b': 7,
+            'cell_size': 4,
+            'kernel_type': 'gaussian'}
 
         for key, val in kargs.items():
             self.cfg.update({key: val})
         self.cfg = dict2tuple(self.cfg)
+
+    def setup_kernel(self, kernel_type):
+        assert kernel_type in ['linear', 'polynomial', 'gaussian']
+        if kernel_type == 'linear':
+            return lambda x1, x2: self._linear_correlation(x1, x2)
+        elif kernel_type == 'polynomial':
+            return lambda x1, x2: self._polynomial_correlation(
+                x1, x2, self.cfg.poly_a, self.cfg.poly_b)
+        elif kernel_type == 'gaussian':
+            return lambda x1, x2: self._gaussian_correlation(
+                x1, x2, self.cfg.sigma)
 
     def init(self, image, init_rect):
         # initialize parameters
@@ -65,7 +80,7 @@ class TrackerKCF(Tracker):
         self.yf = fft(y)
 
         # train classifier
-        k = self._gaussian_correlation(self.z, self.z)
+        k = self._correlation(self.z, self.z)
         self.alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
 
     def update(self, image):
@@ -78,7 +93,7 @@ class TrackerKCF(Tracker):
         # locate target
         x = self._crop(image, self.t_center, self.padded_sz)
         x = self.hann_window * fast_hog(x, self.cfg.cell_size)
-        k = self._gaussian_correlation(x, self.z)
+        k = self._correlation(x, self.z)
         score = real(ifft(complex_mul(self.alphaf, fft(k))))
         offset = self._locate_target(score)
         self.t_center += offset * self.cfg.cell_size
@@ -90,7 +105,7 @@ class TrackerKCF(Tracker):
         # update model
         new_z = self._crop(image, self.t_center, self.padded_sz)
         new_z = self.hann_window * fast_hog(new_z, self.cfg.cell_size)
-        k = self._gaussian_correlation(new_z, new_z)
+        k = self._correlation(new_z, new_z)
         new_alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
             self.cfg.interp_factor * new_alphaf
@@ -126,7 +141,31 @@ class TrackerKCF(Tracker):
 
         return patch
 
-    def _gaussian_correlation(self, x1, x2):
+    def _linear_correlation(self, x1, x2):
+        xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
+        for i in range(self.feat_sz[2]):
+            xcorr_ = cv2.mulSpectrums(
+                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft(xcorr_))
+            xcorr += xcorr_
+        xcorr = circ_shift(xcorr)
+
+        return xcorr / x1.size
+
+    def _polynomial_correlation(self, x1, x2, a, b):
+        xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
+        for i in range(self.feat_sz[2]):
+            xcorr_ = cv2.mulSpectrums(
+                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft(xcorr_))
+            xcorr += xcorr_
+        xcorr = circ_shift(xcorr)
+
+        d = (xcorr / x1.size + a) ** b
+
+        return d
+
+    def _gaussian_correlation(self, x1, x2, sigma):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
         for i in range(self.feat_sz[2]):
             xcorr_ = cv2.mulSpectrums(
@@ -164,3 +203,11 @@ class TrackerKCF(Tracker):
         offset = loc - np.float32(score.shape[1::-1]) / 2
 
         return offset
+
+
+class TrackerDCF(TrackerKCF):
+
+    def __init__(self, **kargs):
+        kargs.update({
+            'kernel_type': 'linear'})
+        super(TrackerDCF, self).__init__(**kargs)
