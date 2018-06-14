@@ -76,7 +76,7 @@ def circ_shift(img):
     if img.ndim == 1:
         w = img.shape[0]
         c = w // 2
-        img[:c], img[c:] = img[w - c:], img[:w - c]
+        out[:c], out[c:] = img[w - c:], img[:w - c]
     elif img.ndim == 2:
         h, w = img.shape
         cy, cx = h // 2, w // 2
@@ -84,6 +84,26 @@ def circ_shift(img):
             img[h - cy:, w - cx:], img[:h - cy, :w - cx]
         out[:cy, cx:], out[cy:, :cx] = \
             img[h - cy:, :w - cx], img[:h - cy, w - cx:]
+    else:
+        raise Exception('only support 1 or 2 dimensional image')
+
+    return out
+
+
+def icirc_shift(img):
+    out = img.copy()
+
+    if img.ndim == 1:
+        w = img.shape[0]
+        c = w // 2
+        out[w - c:], out[:w - c] = img[:c], img[c:]
+    elif img.ndim == 2:
+        h, w = img.shape
+        cy, cx = h // 2, w // 2
+        out[h - cy:, w - cx:], out[:h - cy, :w - cx] = \
+            img[:cy, :cx], img[cy:, cx:]
+        out[h - cy:, :w - cx], out[:h - cy, w - cx:] = \
+            img[:cy, cx:], img[cy:, :cx]
     else:
         raise Exception('only support 1 or 2 dimensional image')
 
