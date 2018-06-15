@@ -45,9 +45,8 @@ class TrackerDCF(Tracker):
         if self.resize_image:
             size = (int(image.shape[1] / 2), int(image.shape[0] / 2))
             image = cv2.resize(image, size)
-        z = self._crop(
-            image, self.t_center, self.padded_sz)
-        z = fast_hog(z, self.cfg.cell_size)
+        z = self._crop(image, self.t_center, self.padded_sz)
+        z = fast_hog(np.float32(z), self.cfg.cell_size)
         self.feat_sz = z.shape
         self.hann_window = np.outer(
             np.hanning(self.feat_sz[0]),
@@ -76,7 +75,7 @@ class TrackerDCF(Tracker):
 
         # locate target
         x = self._crop(image, self.t_center, self.padded_sz)
-        x = self.hann_window * fast_hog(x, self.cfg.cell_size)
+        x = self.hann_window * fast_hog(np.float32(x), self.cfg.cell_size)
         kf = self._linear_correlation(fft2(x), self.zf)
         score = real(ifft2(complex_mul(self.alphaf, kf)))
         offset = self._locate_target(score)
@@ -88,7 +87,7 @@ class TrackerDCF(Tracker):
 
         # update model
         new_z = self._crop(image, self.t_center, self.padded_sz)
-        new_z = fast_hog(new_z, self.cfg.cell_size)
+        new_z = fast_hog(np.float32(new_z), self.cfg.cell_size)
         new_zf = fft2(new_z * self.hann_window)
         kf = self._linear_correlation(new_zf, new_zf)
         new_alphaf = complex_div(self.yf, kf + self.cfg.lambda_)
