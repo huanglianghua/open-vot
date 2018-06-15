@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, fft, ifft, complex_mul, complex_div, circ_shift
+from ..utils.complex import real, fft2, ifft2, complex_mul, complex_div, fftshift
 
 
 class TrackerCSK(Tracker):
@@ -58,7 +58,7 @@ class TrackerCSK(Tracker):
         rs, cs = np.ogrid[:self.padded_sz[1], :self.padded_sz[0]]
         rs, cs = rs - self.padded_sz[1] / 2, cs - self.padded_sz[0] / 2
         y = np.exp(-0.5 / output_sigma ** 2 * (rs ** 2 + cs ** 2))
-        self.yf = fft(y)
+        self.yf = fft2(y)
 
         # initialize hanning window
         self.hann_window = np.outer(
@@ -74,7 +74,7 @@ class TrackerCSK(Tracker):
         self.z = self._crop(image, self.t_center, self.padded_sz)
         self.z = self.hann_window * (np.float32(self.z) / 255 - 0.5)
         k = self._correlation(self.z, self.z)
-        self.alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
+        self.alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
 
     def update(self, image):
         if image.ndim == 3:
@@ -87,7 +87,7 @@ class TrackerCSK(Tracker):
         x = self._crop(image, self.t_center, self.padded_sz)
         x = self.hann_window * (np.float32(x) / 255 - 0.5)
         k = self._correlation(x, self.z)
-        score = real(ifft(complex_mul(self.alphaf, fft(k))))
+        score = real(ifft2(complex_mul(self.alphaf, fft2(k))))
         _, _, _, max_loc = cv2.minMaxLoc(score)
         self.t_center = self.t_center - np.floor(self.padded_sz / 2) + max_loc
         # limit the estimated bounding box to be overlapped with the image
@@ -99,7 +99,7 @@ class TrackerCSK(Tracker):
         new_z = self._crop(image, self.t_center, self.padded_sz)
         new_z = self.hann_window * (np.float32(new_z) / 255 - 0.5)
         k = self._correlation(new_z, new_z)
-        new_alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
+        new_alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
             self.cfg.interp_factor * new_alphaf
         self.z = (1 - self.cfg.interp_factor) * self.z + \
@@ -135,22 +135,22 @@ class TrackerCSK(Tracker):
         return patch
 
     def _linear_correlation(self, x1, x2):
-        xcorr = cv2.mulSpectrums(fft(x1), fft(x2), 0, conjB=True)
-        xcorr = circ_shift(real(ifft(xcorr)))
+        xcorr = cv2.mulSpectrums(fft2(x1), fft2(x2), 0, conjB=True)
+        xcorr = fftshift(real(ifft2(xcorr)))
 
         return xcorr / x1.size
 
     def _polynomial_correlation(self, x1, x2, a, b):
-        xcorr = cv2.mulSpectrums(fft(x1), fft(x2), 0, conjB=True)
-        xcorr = circ_shift(real(ifft(xcorr)))
+        xcorr = cv2.mulSpectrums(fft2(x1), fft2(x2), 0, conjB=True)
+        xcorr = fftshift(real(ifft2(xcorr)))
 
         out = (xcorr / x1.size + a) ** b
 
         return out
 
     def _gaussian_correlation(self, x1, x2, sigma):
-        xcorr = cv2.mulSpectrums(fft(x1), fft(x2), 0, conjB=True)
-        xcorr = circ_shift(real(ifft(xcorr)))
+        xcorr = cv2.mulSpectrums(fft2(x1), fft2(x2), 0, conjB=True)
+        xcorr = fftshift(real(ifft2(xcorr)))
 
         out = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2 * xcorr) / x1.size
         out = out * (out >= 0)

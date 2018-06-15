@@ -19,9 +19,9 @@ def conj(img):
     return img
 
 
-def fft(img):
+def fft2(img):
     img = np.float32(img)
-    if img.ndim in [1, 2]:
+    if img.ndim == 2:
         out = cv2.dft(img, flags=cv2.DFT_COMPLEX_OUTPUT)
     elif img.ndim == 3:
         out = []
@@ -30,12 +30,12 @@ def fft(img):
                 img[..., c], flags=cv2.DFT_COMPLEX_OUTPUT))
         out = np.stack(out, axis=2)
     else:
-        raise Exception('only support 1, 2 or 3 dimensional image')
+        raise Exception('only supports 2 or 3 dimensional array')
     
     return out
 
 
-def ifft(img):
+def ifft2(img):
     img = np.float32(img)
     if img.ndim == 3:
         out = cv2.dft(img, flags=cv2.DFT_INVERSE | cv2.DFT_SCALE)
@@ -45,7 +45,35 @@ def ifft(img):
             out.append(cv2.dft(
                 img[:, :, c, :], flags=cv2.DFT_INVERSE | cv2.DFT_SCALE))
     else:
-        raise Exception('only support 2 or 3 dimensional image')
+        raise Exception('only supports 3 or 4 dimensional array')
+    
+    return out
+
+
+def fft1(img):
+    img = np.float32(img)
+    if img.ndim == 1:
+        img = img[np.newaxis, :]
+        out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_COMPLEX_OUTPUT)
+        out = out.squeeze(0)
+    elif img.ndim == 2:
+        out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_COMPLEX_OUTPUT)
+    else:
+        raise Exception('only supports 1 or 2 dimensional array')
+    
+    return out
+
+
+def ifft1(img):
+    img = np.float32(img)
+    if img.ndim == 2:
+        img = img[np.newaxis, :, :]
+        out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_SCALE)
+        out = out.squeeze(0)
+    elif img.ndim == 3:
+        out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_SCALE)
+    else:
+        raise Exception('only supports 2 or 3 dimensional array')
     
     return out
 
@@ -72,7 +100,7 @@ def complex_div(a, b):
     return out
 
 
-def circ_shift(img):
+def fftshift(img):
     out = img.copy()
 
     if img.ndim == 1:
@@ -87,12 +115,12 @@ def circ_shift(img):
         out[:cy, cx:], out[cy:, :cx] = \
             img[h - cy:, :w - cx], img[:h - cy, w - cx:]
     else:
-        raise Exception('only support 1 or 2 dimensional image')
+        raise Exception('only supports 1 or 2 dimensional array')
 
     return out
 
 
-def icirc_shift(img):
+def ifftshift(img):
     out = img.copy()
 
     if img.ndim == 1:
@@ -107,6 +135,6 @@ def icirc_shift(img):
         out[h - cy:, :w - cx], out[:h - cy, w - cx:] = \
             img[:cy, cx:], img[cy:, :cx]
     else:
-        raise Exception('only support 1 or 2 dimensional image')
+        raise Exception('only supports 1 or 2 dimensional array')
 
     return out

@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, conj, fft, ifft, complex_mul, complex_div
+from ..utils.complex import real, conj, fft2, ifft2, fft1, ifft1, complex_mul, complex_div
 from ..descriptors.fhog import fast_hog
 
 
@@ -57,14 +57,14 @@ class TrackerDSST(Tracker):
         rs, cs = np.ogrid[:self.padded_sz[1], :self.padded_sz[0]]
         rs, cs = rs - self.padded_sz[1] // 2, cs - self.padded_sz[0] // 2
         y = np.exp(-0.5 / output_sigma ** 2 * (rs ** 2 + cs ** 2))
-        self.yf = fft(y)[:, :, np.newaxis, :]
+        self.yf = fft2(y)[:, :, np.newaxis, :]
 
         # create scale gaussian labels
         scale_sigma = self.cfg.scale_sigma_factor * \
             np.sqrt(self.cfg.scale_num)
         ss = np.ogrid[:self.cfg.scale_num] - np.ceil(self.cfg.scale_num / 2)
         ys = np.exp(-0.5 / scale_sigma ** 2 * (ss ** 2))
-        self.ysf = fft(ys)
+        self.ysf = fft1(ys)[:, np.newaxis, :]
         self.scale_factors = self.cfg.scale_step ** (-ss)
 
         # initialize hanning windows
@@ -85,14 +85,13 @@ class TrackerDSST(Tracker):
         z = self._get_translation_sample(
             image, self.t_center, self.padded_sz, self.t_scale)
         self.hf_num, self.hf_den = self._train_translation_filter(
-            fft(z), self.yf)
+            fft2(z), self.yf)
 
         # train scale filter
         zs = self._get_scale_sample(
             image, self.t_center, self.t_sz,
             self.t_scale * self.scale_factors, self.scale_model_sz)
-        zsf = fft(zs[:, np.newaxis, :]).squeeze(1)
-        self.sf_num, self.sf_den = self._train_scale_filter(zsf, self.ysf)
+        self.sf_num, self.sf_den = self._train_scale_filter(fft1(zs), self.ysf)
 
     def update(self, image):
         if image.ndim == 2:
@@ -101,7 +100,7 @@ class TrackerDSST(Tracker):
         # locate target center
         x = self._get_translation_sample(
             image, self.t_center, self.padded_sz, self.t_scale)
-        score = self._calc_translation_score(fft(x), self.hf_num, self.hf_den)
+        score = self._calc_translation_score(fft2(x), self.hf_num, self.hf_den)
         _, _, _, max_loc = cv2.minMaxLoc(score)
         self.t_center = self.t_center - self.t_scale * \
             (np.floor(self.padded_sz / 2) - max_loc)
@@ -114,8 +113,7 @@ class TrackerDSST(Tracker):
         xs = self._get_scale_sample(
             image, self.t_center, self.t_sz,
             self.t_scale * self.scale_factors, self.scale_model_sz)
-        xsf = fft(xs[:, np.newaxis, :]).squeeze(1)
-        score = self._calc_scale_score(xsf, self.sf_num, self.sf_den)
+        score = self._calc_scale_score(fft1(xs), self.sf_num, self.sf_den)
         scale_id = score.argmax()
         self.t_scale *= self.scale_factors[scale_id]
         self.t_scale = np.clip(
@@ -125,7 +123,7 @@ class TrackerDSST(Tracker):
         z = self._get_translation_sample(
             image, self.t_center, self.padded_sz, self.t_scale)
         hf_num, hf_den = self._train_translation_filter(
-            fft(z), self.yf)
+            fft2(z), self.yf)
         self.hf_num = (1 - self.cfg.learning_rate) * self.hf_num + \
             self.cfg.learning_rate * hf_num
         self.hf_den = (1 - self.cfg.learning_rate) * self.hf_den + \
@@ -135,8 +133,7 @@ class TrackerDSST(Tracker):
         zs = self._get_scale_sample(
             image, self.t_center, self.t_sz,
             self.t_scale * self.scale_factors, self.scale_model_sz)
-        zsf = fft(zs[:, np.newaxis, :]).squeeze(1)
-        sf_num, sf_den = self._train_scale_filter(zsf, self.ysf)
+        sf_num, sf_den = self._train_scale_filter(fft1(zs), self.ysf)
         self.sf_num = (1 - self.cfg.learning_rate) * self.sf_num + \
             self.cfg.learning_rate * sf_num
         self.sf_den = (1 - self.cfg.learning_rate) * self.sf_den + \
@@ -213,7 +210,7 @@ class TrackerDSST(Tracker):
         num = np.sum(complex_mul(hf_num, xf), axis=2)
         den = hf_den.copy()
         den[..., 0] += self.cfg.lambda_
-        score = real(ifft(complex_div(num, den)))
+        score = real(ifft2(complex_div(num, den)))
 
         return score
 
@@ -221,7 +218,7 @@ class TrackerDSST(Tracker):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
         den = sf_den.copy()
         den[..., 0] += self.cfg.lambda_
-        score = real(ifft(complex_div(num, den)))
+        score = real(ifft2(complex_div(num, den)))
         score = score.squeeze(1)
 
         return score

@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, fft, ifft, complex_mul, complex_div, circ_shift
+from ..utils.complex import real, fft2, ifft2, complex_mul, complex_div, fftshift
 from ..descriptors.fhog import fast_hog
 
 
@@ -77,11 +77,11 @@ class TrackerKCF(Tracker):
         rs, cs = np.ogrid[:self.feat_sz[0], :self.feat_sz[1]]
         rs, cs = rs - self.feat_sz[0] // 2, cs - self.feat_sz[1] // 2
         y = np.exp(-0.5 / output_sigma ** 2 * (rs ** 2 + cs ** 2))
-        self.yf = fft(y)
+        self.yf = fft2(y)
 
         # train classifier
         k = self._correlation(self.z, self.z)
-        self.alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
+        self.alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
 
     def update(self, image):
         if image.ndim == 2:
@@ -94,7 +94,7 @@ class TrackerKCF(Tracker):
         x = self._crop(image, self.t_center, self.padded_sz)
         x = self.hann_window * fast_hog(x, self.cfg.cell_size)
         k = self._correlation(x, self.z)
-        score = real(ifft(complex_mul(self.alphaf, fft(k))))
+        score = real(ifft2(complex_mul(self.alphaf, fft2(k))))
         offset = self._locate_target(score)
         self.t_center += offset * self.cfg.cell_size
         # limit the estimated bounding box to be overlapped with the image
@@ -106,7 +106,7 @@ class TrackerKCF(Tracker):
         new_z = self._crop(image, self.t_center, self.padded_sz)
         new_z = self.hann_window * fast_hog(new_z, self.cfg.cell_size)
         k = self._correlation(new_z, new_z)
-        new_alphaf = complex_div(self.yf, fft(k) + self.cfg.lambda_)
+        new_alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
             self.cfg.interp_factor * new_alphaf
         self.z = (1 - self.cfg.interp_factor) * self.z + \
@@ -145,10 +145,10 @@ class TrackerKCF(Tracker):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
         for i in range(self.feat_sz[2]):
             xcorr_ = cv2.mulSpectrums(
-                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
-            xcorr_ = real(ifft(xcorr_))
+                fft2(x1[:, :, i]), fft2(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft2(xcorr_))
             xcorr += xcorr_
-        xcorr = circ_shift(xcorr)
+        xcorr = fftshift(xcorr)
 
         return xcorr / x1.size
 
@@ -156,10 +156,10 @@ class TrackerKCF(Tracker):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
         for i in range(self.feat_sz[2]):
             xcorr_ = cv2.mulSpectrums(
-                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
-            xcorr_ = real(ifft(xcorr_))
+                fft2(x1[:, :, i]), fft2(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft2(xcorr_))
             xcorr += xcorr_
-        xcorr = circ_shift(xcorr)
+        xcorr = fftshift(xcorr)
 
         out = (xcorr / x1.size + a) ** b
 
@@ -169,10 +169,10 @@ class TrackerKCF(Tracker):
         xcorr = np.zeros((self.feat_sz[0], self.feat_sz[1]), np.float32)
         for i in range(self.feat_sz[2]):
             xcorr_ = cv2.mulSpectrums(
-                fft(x1[:, :, i]), fft(x2[:, :, i]), 0, conjB=True)
-            xcorr_ = real(ifft(xcorr_))
+                fft2(x1[:, :, i]), fft2(x2[:, :, i]), 0, conjB=True)
+            xcorr_ = real(ifft2(xcorr_))
             xcorr += xcorr_
-        xcorr = circ_shift(xcorr)
+        xcorr = fftshift(xcorr)
 
         out = (np.sum(x1 * x1) + np.sum(x2 * x2) - 2.0 * xcorr) / x1.size
         out[out < 0] = 0

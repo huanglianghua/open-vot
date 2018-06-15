@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, conj, fft, ifft, complex_mul, complex_div
+from ..utils.complex import real, conj, fft2, ifft2, complex_mul, complex_div
 from ..descriptors.fhog import fast_hog
 
 
@@ -53,7 +53,7 @@ class TrackerDCF(Tracker):
             np.hanning(self.feat_sz[0]),
             np.hanning(self.feat_sz[1])).astype(np.float32)
         self.hann_window = self.hann_window[:, :, np.newaxis]
-        self.zf = fft(z * self.hann_window)
+        self.zf = fft2(z * self.hann_window)
 
         # create gaussian labels
         output_sigma = self.cfg.output_sigma_factor * \
@@ -61,7 +61,7 @@ class TrackerDCF(Tracker):
         rs, cs = np.ogrid[:self.feat_sz[0], :self.feat_sz[1]]
         rs, cs = rs - self.feat_sz[0] // 2, cs - self.feat_sz[1] // 2
         y = np.exp(-0.5 / output_sigma ** 2 * (rs ** 2 + cs ** 2))
-        self.yf = fft(y)
+        self.yf = fft2(y)
 
         # train classifier
         kf = self._linear_correlation(self.zf, self.zf)
@@ -77,8 +77,8 @@ class TrackerDCF(Tracker):
         # locate target
         x = self._crop(image, self.t_center, self.padded_sz)
         x = self.hann_window * fast_hog(x, self.cfg.cell_size)
-        kf = self._linear_correlation(fft(x), self.zf)
-        score = real(ifft(complex_mul(self.alphaf, kf)))
+        kf = self._linear_correlation(fft2(x), self.zf)
+        score = real(ifft2(complex_mul(self.alphaf, kf)))
         offset = self._locate_target(score)
         self.t_center += offset * self.cfg.cell_size
         # limit the estimated bounding box to be overlapped with the image
@@ -89,7 +89,7 @@ class TrackerDCF(Tracker):
         # update model
         new_z = self._crop(image, self.t_center, self.padded_sz)
         new_z = fast_hog(new_z, self.cfg.cell_size)
-        new_zf = fft(new_z * self.hann_window)
+        new_zf = fft2(new_z * self.hann_window)
         kf = self._linear_correlation(new_zf, new_zf)
         new_alphaf = complex_div(self.yf, kf + self.cfg.lambda_)
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
