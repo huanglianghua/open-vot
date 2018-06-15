@@ -208,17 +208,14 @@ class TrackerDSST(Tracker):
 
     def _calc_translation_score(self, xf, hf_num, hf_den):
         num = np.sum(complex_mul(hf_num, xf), axis=2)
-        den = hf_den.copy()
-        den[..., 0] += self.cfg.lambda_
+        den = hf_den + self.cfg.lambda_
         score = real(ifft2(complex_div(num, den)))
 
         return score
 
     def _calc_scale_score(self, xsf, sf_num, sf_den):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
-        den = sf_den.copy()
-        den[..., 0] += self.cfg.lambda_
-        score = real(ifft2(complex_div(num, den)))
-        score = score.squeeze(1)
+        den = sf_den + self.cfg.lambda_
+        score = real(ifft2(complex_div(num, den))).squeeze(1)
 
         return score
