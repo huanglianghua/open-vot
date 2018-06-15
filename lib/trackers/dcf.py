@@ -21,8 +21,7 @@ class TrackerDCF(Tracker):
             'padding': 1.5,
             'output_sigma_factor': 0.125,
             'interp_factor': 0.012,
-            'cell_size': 4,
-            'kernel_type': 'gaussian'}
+            'cell_size': 4}
 
         for key, val in kargs.items():
             self.cfg.update({key: val})

@@ -21,7 +21,7 @@ def conj(img):
 
 def fft(img):
     img = np.float32(img)
-    if img.ndim == 2:
+    if img.ndim in [1, 2]:
         out = cv2.dft(img, flags=cv2.DFT_COMPLEX_OUTPUT)
     elif img.ndim == 3:
         out = []
@@ -30,7 +30,7 @@ def fft(img):
                 img[..., c], flags=cv2.DFT_COMPLEX_OUTPUT))
         out = np.stack(out, axis=2)
     else:
-        raise Exception('only support 2 or 3 dimensional image')
+        raise Exception('only support 1, 2 or 3 dimensional image')
     
     return out
 
@@ -51,6 +51,7 @@ def ifft(img):
 
 
 def complex_mul(a, b):
+    a, b = np.broadcast_arrays(a, b)
     out = a.copy()
     out[..., 0] = a[..., 0] * b[..., 0] - a[..., 1] * b[..., 1]
     out[..., 1] = a[..., 0] * b[..., 1] + a[..., 1] * b[..., 0]
@@ -59,6 +60,7 @@ def complex_mul(a, b):
 
 
 def complex_div(a, b):
+    a, b = np.broadcast_arrays(a, b)
     out = a.copy()
     divisor = b[..., 0] ** 2 + b[..., 1] ** 2
 
