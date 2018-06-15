@@ -87,17 +87,19 @@ class TrackerDSST(Tracker):
             image, self.t_center, self.padded_sz, self.t_scale)
         score = self._calc_translation_score(fft(x), self.hf_num, self.hf_den)
         _, _, _, max_loc = cv2.minMaxLoc(score)
-        self.t_center = self.t_center - np.floor(self.padded_sz / 2) + max_loc
+        self.t_center = self.t_center - self.t_scale * \
+            (np.floor(self.padded_sz / 2) - max_loc)
         # limit the estimated bounding box to be overlapped with the image
         self.t_center = np.clip(
             self.t_center, -self.t_sz / 2 + 1,
             image.shape[1::-1] + self.t_sz / 2 - 2)
-        
+
         # locate target scale
         xs = self._get_scale_sample(
             image, self.t_center, self.t_sz,
             self.t_scale * self.scale_factors)
-        score = self._calc_scale_score(fft(xs), self.sf_num, self.sf_den)
+        xsf = fft(xs[:, np.newaxis, :]).squeeze(1)
+        score = self._calc_scale_score(xsf, self.sf_num, self.sf_den)
         scale_id = score.argmax()
         self.t_scale *= self.scale_factors[scale_id]
 
@@ -133,7 +135,7 @@ class TrackerDSST(Tracker):
         patch = self._crop(image, center, patch_sz)
         if np.any(patch.shape[1::-1] != size):
             patch = cv2.resize(patch, tuple(size))
-        
+
         feature = fast_hog(np.float32(patch), 1)[:, :, :27]
         feature = np.pad(feature, ((1, 1), (1, 1), (0, 0)), 'constant')
         gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
@@ -183,7 +185,7 @@ class TrackerDSST(Tracker):
         return hf_num, hf_den
 
     def _train_scale_filter(self, zsf, ysf):
-        sf_num = complex_mul(ysf, zsf)
+        sf_num = complex_mul(ysf, conj(zsf))
         sf_den = complex_mul(zsf, conj(zsf))
         sf_den = np.sum(sf_den, axis=1, keepdims=True)
 
@@ -191,45 +193,17 @@ class TrackerDSST(Tracker):
 
     def _calc_translation_score(self, xf, hf_num, hf_den):
         num = np.sum(complex_mul(hf_num, xf), axis=2)
-        den = hf_den + self.cfg.lambda_
+        den = hf_den.copy()
+        den[..., 0] += self.cfg.lambda_
         score = real(ifft(complex_div(num, den)))
 
         return score
 
     def _calc_scale_score(self, xsf, sf_num, sf_den):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
-        den = sf_den + self.cfg.lambda_
+        den = sf_den.copy()
+        den[..., 0] += self.cfg.lambda_
         score = real(ifft(complex_div(num, den)))
         score = score.squeeze(1)
 
         return score
-
-    def _linear_correlation(self, x1f, x2f):
-        xcorr = complex_mul(x1f, conj(x2f))
-        xcorr = np.sum(xcorr, axis=2) / x1f.size
-
-        return xcorr
-
-    def _locate_target(self, score):
-        def subpixel_peak(left, center, right):
-            divisor = 2 * center - left - right
-            if abs(divisor) < 1e-3:
-                return 0
-            return 0.5 * (right - left) / divisor
-
-        _, _, _, max_loc = cv2.minMaxLoc(score)
-        loc = np.float32(max_loc)
-
-        if max_loc[0] in range(1, score.shape[1] - 1):
-            loc[0] += subpixel_peak(
-                score[max_loc[1], max_loc[0] - 1],
-                score[max_loc[1], max_loc[0]],
-                score[max_loc[1], max_loc[0] + 1])
-        if max_loc[1] in range(1, score.shape[0] - 1):
-            loc[1] += subpixel_peak(
-                score[max_loc[1] - 1, max_loc[0]],
-                score[max_loc[1], max_loc[0]],
-                score[max_loc[1] + 1, max_loc[0]])
-        offset = loc - np.float32(score.shape[1::-1]) / 2
-
-        return offset
