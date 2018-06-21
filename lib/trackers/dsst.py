@@ -139,9 +139,8 @@ class TrackerDSST(Tracker):
         self.sf_den = (1 - self.cfg.learning_rate) * self.sf_den + \
             self.cfg.learning_rate * sf_den
 
-        bndbox = np.concatenate([
-            self.t_center - self.t_sz * self.t_scale / 2,
-            self.t_sz * self.t_scale])
+        t_sz = np.floor(self.t_sz * self.t_scale)
+        bndbox = np.concatenate([self.t_center - t_sz / 2, t_sz])
 
         return bndbox
 
@@ -151,10 +150,10 @@ class TrackerDSST(Tracker):
         if np.any(patch.shape[1::-1] != size):
             patch = cv2.resize(patch, tuple(size))
 
-        feature = fast_hog(np.float32(patch) / 255.0, 1)[:, :, :27]
+        feature = fast_hog(np.float32(patch), 1)[:, :, :27]
         feature = np.pad(feature, ((1, 1), (1, 1), (0, 0)), 'edge')
         gray = cv2.cvtColor(patch, cv2.COLOR_BGR2GRAY)[:, :, np.newaxis]
-        feature = np.concatenate((gray, feature), axis=2)
+        feature = np.concatenate((gray / 255.0 - 0.5, feature), axis=2)
 
         return self.hann_window * feature
 
@@ -216,7 +215,6 @@ class TrackerDSST(Tracker):
     def _calc_scale_score(self, xsf, sf_num, sf_den):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
         den = sf_den + self.cfg.lambda_
-        score = real(ifft2(complex_div(num, den)))
-        score = score.squeeze(1)
+        score = real(ifft2(complex_div(num, den))).squeeze(1)
 
         return score
