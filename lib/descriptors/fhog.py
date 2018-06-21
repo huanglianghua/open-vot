@@ -310,10 +310,11 @@ def pca_feature_maps(mapp):
 	return mapp
 
 
-def fast_hog(image, k):
+def fast_hog(image, k, truncate=True):
 	mapp = {'sizeX': 0, 'sizeY': 0, 'numFeatures': 0, 'map': 0}
 	mapp = get_feature_maps(image, k, mapp)
-	mapp = normalize_and_truncate(mapp, 0.2)
+	if truncate:
+		mapp = normalize_and_truncate(mapp, 0.2)
 	mapp = pca_feature_maps(mapp)
 	feature = mapp['map']
 	feature = feature.reshape((

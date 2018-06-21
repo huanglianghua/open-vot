@@ -41,7 +41,7 @@ class TrackerDSST(Tracker):
         self.padded_sz = self.t_sz * (1 + self.cfg.padding)
 
         scale_factor = 1.0
-        if self.t_sz.prod() < self.cfg.scale_model_max_area:
+        if self.t_sz.prod() > self.cfg.scale_model_max_area:
             scale_factor = np.sqrt(
                 self.cfg.scale_model_max_area / self.t_sz.prod())
         self.scale_model_sz = (self.t_sz * scale_factor).astype(int)
@@ -164,7 +164,7 @@ class TrackerDSST(Tracker):
             patch_sz = size * scale
             patch = self._crop(image, center, patch_sz)
             patch = cv2.resize(patch, tuple(scale_model_sz))
-            feature = fast_hog(np.float32(patch) / 255.0, 4)
+            feature = fast_hog(np.float32(patch) / 255.0, 4, False)
             features.append(feature.reshape(-1))
         features = np.stack(features)
 
@@ -208,16 +208,14 @@ class TrackerDSST(Tracker):
 
     def _calc_translation_score(self, xf, hf_num, hf_den):
         num = np.sum(complex_mul(hf_num, xf), axis=2)
-        den = hf_den.copy()
-        den[..., 0] += self.cfg.lambda_
+        den = hf_den + self.cfg.lambda_
         score = real(ifft2(complex_div(num, den)))
 
         return score
 
     def _calc_scale_score(self, xsf, sf_num, sf_den):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
-        den = sf_den.copy()
-        den[..., 0] += self.cfg.lambda_
+        den = sf_den + self.cfg.lambda_
         score = real(ifft2(complex_div(num, den)))
         score = score.squeeze(1)
 
