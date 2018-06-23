@@ -2,8 +2,14 @@ from __future__ import absolute_import
 
 import argparse
 
-from lib.managers import ManagerMOSSE
+from lib.trackers import TrackerMOSSE
+from lib.experiments import ExperimentOTB
+
 
 otb_dir = 'data/OTB'
-manager = ManagerMOSSE()
-manager.track(otb_dir, visualize=True)
+experiment = ExperimentOTB(otb_dir)
+
+tracker = TrackerMOSSE()
+experiment.run(tracker, visualize=True)
+
+performance = experiment.report([tracker.name])

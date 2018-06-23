@@ -5,4 +5,6 @@ data
 cache
 pretrained
 logs
+results
+reports
 !.gitignore

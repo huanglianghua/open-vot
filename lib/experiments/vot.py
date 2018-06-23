@@ -188,7 +188,7 @@ class ExperimentVOT(object):
                             failed = True
                             states.append([2])
                             init_frame = next_frame + self.skip_initialize
-                    else failed:
+                    elif failed:
                         states.append([0])
                         elapsed_time = np.nan
                     times.append(elapsed_time)
