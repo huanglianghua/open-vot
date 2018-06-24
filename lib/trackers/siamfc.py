@@ -5,13 +5,15 @@ import os
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+import numpy as np
+import cv2
 from torch.optim.lr_scheduler import StepLR
 
 from . import Tracker
 from ..utils import dict2tuple
 from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
-from ..utils.warp import crop_tensor, resize_tensor
+from ..utils.warp import warp_cv2
 
 
 class BCEWeightedLoss(nn.Module):
@@ -129,48 +131,58 @@ class TrackerSiamFC(Tracker):
         self.criterion = BCEWeightedLoss().to(self.device)
 
     def init(self, image, init_rect):
-        image = torch.from_numpy(image).to(
-            self.device).permute(2, 0, 1).unsqueeze(0).float()
-        init_rect = torch.from_numpy(init_rect).to(self.device).float()
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         # initialize parameters
         self.center = init_rect[:2] + init_rect[2:] / 2
         self.target_sz = init_rect[2:]
         context = self.cfg.context * self.target_sz.sum()
-        self.z_sz = torch.sqrt((self.target_sz + context).prod())
+        self.z_sz = np.sqrt((self.target_sz + context).prod())
         self.x_sz = self.z_sz * self.cfg.search_sz / self.cfg.exemplar_sz
 
-        self.scale_factors = self.cfg.scale_step ** torch.linspace(
-            -(self.cfg.scale_num // 2),
-            self.cfg.scale_num // 2, self.cfg.scale_num).to(self.device)
+        self.scale_factors = self.cfg.scale_step ** np.linspace(
+            -self.cfg.scale_num // 2,
+            self.cfg.scale_num // 2, self.cfg.scale_num)
         self.score_sz, self.total_stride = self._deduce_network_params(
             self.cfg.exemplar_sz, self.cfg.search_sz)
         self.final_score_sz = self.cfg.response_up * (self.score_sz - 1) + 1
 
-        hann_1d = torch.hann_window(self.final_score_sz).to(self.device)
-        self.penalty = torch.mm(hann_1d.view(-1, 1), hann_1d.view(1, -1))
-        self.penalty = self.penalty / self.penalty.sum()
+        self.penalty = np.outer(
+            np.hanning(self.final_score_sz),
+            np.hanning(self.final_score_sz))
+        self.penalty /= self.penalty.sum()
+        self.avg_color = np.mean(image, axis=(0, 1))
 
         # extract template features
-        crop_z = crop_tensor(image, self.center, self.z_sz,
-                             out_size=self.cfg.exemplar_sz)
+        crop_z = warp_cv2(image, self.center, self.z_sz,
+                          self.cfg.exemplar_sz, self.avg_color)
+        crop_z = torch.from_numpy(crop_z).to(
+            self.device).permute(2, 0, 1).unsqueeze(0).float()
         with torch.set_grad_enabled(False):
             self.branch.eval()
             self.z = self.branch(crop_z)
 
     def update(self, image):
-        image = torch.from_numpy(image).to(
-            self.device).permute(2, 0, 1).unsqueeze(0).float()
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        else:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         # update scaled sizes
         scaled_exemplar = self.scale_factors * self.z_sz
         scaled_search_area = self.scale_factors * self.x_sz
-        scaled_target = self.scale_factors[:, None] * self.target_sz
+        scaled_target = self.scale_factors[:, np.newaxis] * self.target_sz
 
         # locate target
-        crops_x = torch.cat([crop_tensor(
-            image, self.center, size, out_size=self.cfg.search_sz)
-            for size in scaled_search_area], dim=0)
+        crops_x = [warp_cv2(
+            image, self.center, size, self.cfg.search_sz, self.avg_color)
+            for size in scaled_search_area]
+        crops_x = torch.stack([torch.from_numpy(c).to(
+            self.device).permute(2, 0, 1).float()
+            for c in crops_x], dim=0)
         with torch.set_grad_enabled(False):
             self.branch.eval()
             x = self.branch(crops_x)
@@ -188,8 +200,10 @@ class TrackerSiamFC(Tracker):
         # self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
         #     self.cfg.scale_lr * scaled_exemplar[scale_id]
         if self.cfg.z_lr > 0:
-            crop_z = crop_tensor(image, self.center, self.z_sz,
-                                 out_size=self.cfg.exemplar_sz)
+            crop_z = warp_cv2(image, self.center, self.z_sz,
+                              self.cfg.exemplar_sz, self.avg_color)
+            crop_z = torch.from_numpy(crop_z).to(
+                self.device).permute(2, 0, 1).unsqueeze(0).float()
             with torch.set_grad_enabled(False):
                 self.branch.eval()
                 new_z = self.branch(crop_z)
@@ -198,8 +212,8 @@ class TrackerSiamFC(Tracker):
         self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
             self.cfg.scale_lr * scaled_exemplar[scale_id]
 
-        bndbox = torch.cat([self.center - self.target_sz / 2,
-                            self.target_sz]).cpu().numpy()
+        bndbox = np.concatenate([
+            self.center - self.target_sz / 2, self.target_sz])
 
         return bndbox
 
@@ -252,8 +266,10 @@ class TrackerSiamFC(Tracker):
         scores[self.cfg.scale_num // 2 + 1:] *= self.cfg.scale_penalty
         scale_id = scores.view(self.cfg.scale_num, -1).max(dim=1)[0].argmax()
 
-        score = scores[scale_id].unsqueeze(0)
-        score = resize_tensor(score, self.final_score_sz)
+        score = scores[scale_id].squeeze(0).cpu().numpy()
+        score = cv2.resize(
+            score, (self.final_score_sz, self.final_score_sz),
+            interpolation=cv2.INTER_CUBIC)
         score -= score.min()
         score /= max(1e-12, score.sum())
         score = (1 - self.cfg.window_influence) * score + \
@@ -263,13 +279,10 @@ class TrackerSiamFC(Tracker):
 
     def _locate_target(self, center, score, final_score_sz,
                        total_stride, search_sz, response_up, x_sz):
-        max_ind = score.argmax()
-        pos = torch.stack([
-            max_ind % self.final_score_sz,
-            max_ind / self.final_score_sz]).float()
+        pos = np.unravel_index(score.argmax(), score.shape)[::-1]
         half = (final_score_sz - 1) / 2
 
-        disp_in_area = pos - half
+        disp_in_area = np.asarray(pos) - half
         disp_in_xcrop = disp_in_area * total_stride / response_up
         disp_in_frame = disp_in_xcrop * x_sz / search_sz
 

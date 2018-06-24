@@ -141,3 +141,17 @@ def resize_tensor(image, size):
     grid = F.affine_grid(theta, size)
 
     return F.grid_sample(image, grid)
+
+
+def warp_cv2(image, center, size, out_size, padding):
+    if isinstance(out_size, numbers.Number):
+        out_size = np.array([out_size, out_size], dtype=int)
+    sx, sy = out_size / size
+    dx, dy = -(center - size / 2) * [sx, sy]
+    affine = np.array([[sx, 0, dx],
+                       [0, sy, dy]]).astype(np.float32)
+    patch = cv2.warpAffine(
+        image, affine, tuple(out_size), flags=cv2.INTER_CUBIC,
+        borderMode=cv2.BORDER_CONSTANT, borderValue=padding)
+    
+    return patch
