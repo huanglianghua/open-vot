@@ -142,6 +142,8 @@ class TrackerSiamFC(Tracker):
         context = self.cfg.context * self.target_sz.sum()
         self.z_sz = np.sqrt((self.target_sz + context).prod())
         self.x_sz = self.z_sz * self.cfg.search_sz / self.cfg.exemplar_sz
+        self.min_x_sz = 0.2 * self.x_sz
+        self.max_x_sz = 5.0 * self.x_sz
 
         self.scale_factors = self.cfg.scale_step ** np.linspace(
             -self.cfg.scale_num // 2,
@@ -190,6 +192,7 @@ class TrackerSiamFC(Tracker):
 
         self.x_sz = (1 - self.cfg.scale_lr) * self.x_sz + \
             self.cfg.scale_lr * scaled_search_area[scale_id]
+        self.x_sz = np.clip(self.x_sz, self.min_x_sz, self.max_x_sz)
         self.center = self._locate_target(self.center, score, self.final_score_sz,
                                           self.total_stride, self.cfg.search_sz,
                                           self.cfg.response_up, self.x_sz)
