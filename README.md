@@ -18,7 +18,7 @@ pip install scipy opencv-contrib-python numba matplotlib h5py torchvision tensor
 
 **Tracking with pretrained models**
 
-Download pretrained models from [here](https://pan.baidu.com/s/1OutjOlWxmiiA4qna7UFHGg), then execute the following command:
+Download pretrained models from [here](https://pan.baidu.com/s/1Q6VQpJnyDaZfyidH8A2rJg), then execute the following command:
 
 ```shell
 python examples/goturn --phase test
