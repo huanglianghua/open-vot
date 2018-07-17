@@ -31,6 +31,8 @@ class ExperimentOTB(object):
             self._record(tracker.name, seq_name, rects, speed_fps)
 
     def report(self, tracker_names):
+        if isinstance(tracker_names, str):
+            tracker_names = [tracker_names]
         if not isinstance(tracker_names, collections.Container):
             tracker_names = [tracker_names]
 
