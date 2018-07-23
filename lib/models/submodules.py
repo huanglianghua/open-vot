@@ -23,7 +23,7 @@ class Adjust2d(nn.Module):
 
     def __init__(self, norm='bn'):
         super(Adjust2d, self).__init__()
-        assert norm in [None, 'bn', 'cosine', 'euclidean', 'linear']
+        assert norm in [None, 'bn', 'cosine', 'euclidean', 'linear', 'cosine_similarity']
         self.norm = norm
         if norm == 'bn':
             self.bn = nn.BatchNorm2d(1)
@@ -51,6 +51,14 @@ class Adjust2d(nn.Module):
                 F.avg_pool2d(torch.pow(x, 2), k, 1).sum(1, keepdim=True)
             out = out + sqr_z + sqr_x
             out = out.clamp(min=1e-32).sqrt()
+        elif self.norm == 'cosine_similarity':
+            height_z, width_z = z.size()[-2:]
+            height_x, width_x = x.size()[-2:]
+            height_out, width_out = height_x - height_z + 1,  width_x - width_z + 1
+            im2col_z = F.unfold(z, (height_z, width_z))
+            im2col_x = F.unfold(x, (height_z, width_z))
+            cosine_similarity = F.cosine_similarity(im2col_z,im2col_x)
+            out = cosine_similarity.reshape(-1,1,height_out,width_out)
         elif self.norm == None:
             out = out
 
