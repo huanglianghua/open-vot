@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import cv2
 import numpy as np
+import torch
 
 
 def real(img):
@@ -31,7 +32,7 @@ def fft2(img):
         out = np.stack(out, axis=2)
     else:
         raise Exception('only supports 2 or 3 dimensional array')
-    
+
     return out
 
 
@@ -46,7 +47,7 @@ def ifft2(img):
                 img[:, :, c, :], flags=cv2.DFT_INVERSE | cv2.DFT_SCALE))
     else:
         raise Exception('only supports 3 or 4 dimensional array')
-    
+
     return out
 
 
@@ -60,7 +61,7 @@ def fft1(img):
         out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_COMPLEX_OUTPUT)
     else:
         raise Exception('only supports 1 or 2 dimensional array')
-    
+
     return out
 
 
@@ -74,7 +75,7 @@ def ifft1(img):
         out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_SCALE)
     else:
         raise Exception('only supports 2 or 3 dimensional array')
-    
+
     return out
 
 
@@ -99,6 +100,26 @@ def complex_div(a, b):
 
     return out
 
+def tensor_complex_mul(x, z): # x z
+    out_real = x[..., 0] * z[..., 0] - x[..., 1] * z[..., 1]
+    out_imag = x[..., 0] * z[..., 1] + x[..., 1] * z[..., 0]
+    return torch.stack((out_real, out_imag), -1)
+
+def tensor_complex_mulconj(x, z): #x  z*
+    out_real = x[..., 0] * z[..., 0] + x[..., 1] * z[..., 1]
+    out_imag = x[..., 1] * z[..., 0] - x[..., 0] * z[..., 1]
+    return torch.stack((out_real, out_imag), -1)
+
+def tensor_complex_conj(x): #x*
+    out_real = x[..., 0]
+    out_imag = -1*x[..., 1]
+    return torch.stack((out_real, out_imag), -1)
+
+def tensor_complex_division(x, z):
+    denominator = z[..., 0]**2 + z[..., 1]**2
+    out_real = (x[..., 0] * z[..., 0] + x[..., 1] * z[..., 1]) / denominator
+    out_imag = (x[..., 1] * z[..., 0] - x[..., 0] * z[..., 1]) / denominator
+    return torch.stack((out_real, out_imag), -1)
 
 def fftshift(img):
     out = img.copy()

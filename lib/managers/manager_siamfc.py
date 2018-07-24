@@ -11,7 +11,10 @@ from ..datasets import VOT, ImageNetVID, Pairwise
 from ..metrics import iou, center_error
 from ..utils import initialize_weights
 from ..transforms import TransformSiamFC
-
+from lib.utils.viz import show_frame
+import unittest
+import random
+from torchvision import transforms
 
 class ManagerSiamFC(object):
 
@@ -91,7 +94,7 @@ class ManagerSiamFC(object):
 
         # training dataset
         dataset_train = Pairwise(
-            base_dataset, transform, subset='train')
+            base_dataset, transform, subset='train', causal=True)
         dataloader_train = DataLoader(
             dataset_train, batch_size=self.cfg.batch_size, shuffle=True,
             pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
@@ -102,6 +105,17 @@ class ManagerSiamFC(object):
         dataloader_val = DataLoader(
             dataset_val, batch_size=self.cfg.batch_size, shuffle=False,
             pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
+
+        # for i, item in enumerate(dataset_train):
+        #     item = random.choice(dataset_train)
+        #     img_z, img_x, bndbox_z, bndbox_x = \
+        #         transforms.ToPILImage()(item[0]), transforms.ToPILImage()(item[1]), item[2], item[3]
+        #     # print(type(img_z), type(img_x), bndbox_z, bndbox_x.shape)
+        #     print(item[0].size())
+        #     show_frame(img_z, bndbox_z, fig_n=1, pause=1)
+        #     show_frame(img_x, bndbox_x, fig_n=2, pause=1)
+        #     input()
+        #     print("hi")
 
         train_iters = len(dataloader_train)
         val_iters = len(dataloader_val)
