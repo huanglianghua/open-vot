@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, fft2, ifft2, complex_mul, complex_div, fftshift
+from ..utils.complex import real, fft2, ifft2, complex_add, complex_mul, complex_div, fftshift
 
 
 class TrackerCSK(Tracker):
@@ -74,7 +74,7 @@ class TrackerCSK(Tracker):
         self.z = self._crop(image, self.t_center, self.padded_sz)
         self.z = self.hann_window * (np.float32(self.z) / 255 - 0.5)
         k = self._correlation(self.z, self.z)
-        self.alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
+        self.alphaf = complex_div(self.yf, complex_add(fft2(k), self.cfg.lambda_))
 
     def update(self, image):
         if image.ndim == 3:
@@ -99,7 +99,7 @@ class TrackerCSK(Tracker):
         new_z = self._crop(image, self.t_center, self.padded_sz)
         new_z = self.hann_window * (np.float32(new_z) / 255 - 0.5)
         k = self._correlation(new_z, new_z)
-        new_alphaf = complex_div(self.yf, fft2(k) + self.cfg.lambda_)
+        new_alphaf = complex_div(self.yf, complex_add(fft2(k), self.cfg.lambda_))
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
             self.cfg.interp_factor * new_alphaf
         self.z = (1 - self.cfg.interp_factor) * self.z + \

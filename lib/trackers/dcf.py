@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, conj, fft2, ifft2, complex_mul, complex_div
+from ..utils.complex import real, conj, fft2, ifft2, complex_add, complex_mul, complex_div
 from ..descriptors.fhog import fast_hog
 
 
@@ -64,7 +64,7 @@ class TrackerDCF(Tracker):
 
         # train classifier
         kf = self._linear_correlation(self.zf, self.zf)
-        self.alphaf = complex_div(self.yf, kf + self.cfg.lambda_)
+        self.alphaf = complex_div(self.yf, complex_add(kf, self.cfg.lambda_))
 
     def update(self, image):
         if image.ndim == 2:
@@ -90,7 +90,7 @@ class TrackerDCF(Tracker):
         new_z = fast_hog(np.float32(new_z), self.cfg.cell_size)
         new_zf = fft2(new_z * self.hann_window)
         kf = self._linear_correlation(new_zf, new_zf)
-        new_alphaf = complex_div(self.yf, kf + self.cfg.lambda_)
+        new_alphaf = complex_div(self.yf, complex_add(kf, self.cfg.lambda_))
         self.alphaf = (1 - self.cfg.interp_factor) * self.alphaf + \
             self.cfg.interp_factor * new_alphaf
         self.zf = (1 - self.cfg.interp_factor) * self.zf + \

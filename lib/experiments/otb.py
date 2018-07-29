@@ -44,8 +44,9 @@ class ExperimentOTB(object):
         
         performance = {}
         for name in tracker_names:
-            succ_curve = None
-            prec_curve = None
+            seq_num = len(self.dataset)
+            succ_curve = np.zeros((seq_num, self.nbins_iou))
+            prec_curve = np.zeros((seq_num, self.nbins_ce))
 
             for s, (_, anno) in enumerate(self.dataset):
                 seq_name = self.dataset.seq_names[s]
@@ -56,23 +57,14 @@ class ExperimentOTB(object):
 
                 if len(rects) > len(anno):
                     rects = rects[:len(anno)]
-                elif len(rects) < len(anno):
-                    anno = anno[5:]
                 assert len(rects) == len(anno)
 
                 ious = iou(rects, anno)
                 center_errors = center_error(rects, anno)
-
-                succ_curve_, prec_curve_ = self._calc_curves(ious, center_errors)
-                if succ_curve is None:
-                    succ_curve = succ_curve_
-                    prec_curve = prec_curve_
-                else:
-                    succ_curve += succ_curve_
-                    prec_curve += prec_curve_ 
+                succ_curve[s], prec_curve[s] = self._calc_curves(ious, center_errors)
             
-            succ_curve /= len(self.dataset)
-            prec_curve /= len(self.dataset)
+            succ_curve = np.mean(succ_curve, axis=0)
+            prec_curve = np.mean(prec_curve, axis=0)
             succ_score = np.mean(succ_curve)
             prec_score = prec_curve[20]
 
