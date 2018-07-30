@@ -63,6 +63,9 @@ class TransformSiamFC(object):
             crop_z = torch.clamp(crop_z, 0.0, 255.0)
             crop_x = torch.clamp(crop_x, 0.0, 255.0)
 
+        crop_z = (crop_z / 255.0 - 0.5) / 0.5
+        crop_x = (crop_x / 255.0 - 0.5) / 0.5
+
         return crop_z, crop_x, labels, weights
 
     def _crop(self, image, bndbox, out_size):

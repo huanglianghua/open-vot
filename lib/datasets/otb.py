@@ -108,7 +108,6 @@ class OTB(object):
         # to deal with different delimeters
         with open(self.anno_files[index], 'r') as f:
             anno = np.loadtxt(io.StringIO(f.read().replace(',', ' ')))
-
         return img_files, anno
 
     def __len__(self):

@@ -8,7 +8,7 @@ from PIL import Image
 class Pairwise(Dataset):
 
     def __init__(self, base_dataset, transform=None, pairs_per_video=25,
-                 frame_range=100, causal=False, return_index=False,
+                 frame_range=10, causal=False, return_index=False,
                  rand_choice=True, subset='train', train_ratio=0.95):
         super(Pairwise, self).__init__()
         assert subset in ['train', 'val']

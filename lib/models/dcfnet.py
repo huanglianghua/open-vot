@@ -69,8 +69,7 @@ class DCFNetOnline(nn.Module):
         solution =  tensor_complex_division(self.model_alphaf, self.model_betaf + self.config.lambda0)
         response = torch.irfft(torch.sum(tensor_complex_mulconj(xf, solution), dim=1, keepdim=True), signal_ndim=2)
         r_max = torch.max(response)
-        # cv2.imshow('response', self.config.y)
-        # cv2.waitKey(0)
+
         return response
 
     def update(self, z, lr=1.):

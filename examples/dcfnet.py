@@ -9,7 +9,8 @@ from lib.experiments import ExperimentOTB
 otb_dir = 'data/OTB'
 experiment = ExperimentOTB(otb_dir)
 
-tracker = TrackerDCFNet(net_path=None)
+net_path = 'logs/dcfnet/checkpoints/siamfc_step2.pth'
+tracker = TrackerDCFNet(net_path=net_path,online=True)
 experiment.run(tracker, visualize=True)
 
 print(experiment.report(tracker.name))

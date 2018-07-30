@@ -55,7 +55,7 @@ class TransformDCFNet(object):
             crop_x += torch.from_numpy(offset_x).float()
             crop_z = torch.clamp(crop_z, 0.0, 255.0)
             crop_x = torch.clamp(crop_x, 0.0, 255.0)
-            
+
         return crop_z, crop_x
 
     def _crop(self, image, bndbox):

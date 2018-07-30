@@ -160,8 +160,6 @@ class ManagerSiamFC(object):
                 self.track(vot_dir, visualize=False)
 
             # add checkpoint
-            self.logger.add_checkpoint(
-                'siamfc', self.tracker.model.module.state_dict(),
-                (epoch + 1) // 100 + 1)
+            self.logger.add_checkpoint('siamfc', self.tracker.model.module.state_dict(), epoch)
 
         return tracker

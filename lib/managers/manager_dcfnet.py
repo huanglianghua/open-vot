@@ -91,8 +91,6 @@ class ManagerDCFNet(object):
             self.logger.add_scalar('train/val_epoch_loss', loss_val, epoch)
 
             # add checkpoint
-            self.logger.add_checkpoint(
-                'siamfc', self.tracker.model.module.state_dict(),
-                (epoch + 1) // 100 + 1)
+            self.logger.add_checkpoint('dcfnet', self.tracker.model.module.state_dict(), epoch)
 
         return tracker

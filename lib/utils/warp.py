@@ -151,7 +151,7 @@ def warp_cv2(image, center, size, out_size, padding):
     affine = np.array([[sx, 0, dx],
                        [0, sy, dy]]).astype(np.float32)
     patch = cv2.warpAffine(
-        image, affine, tuple(out_size), flags=cv2.INTER_CUBIC,
+        image, affine, tuple(out_size),
         borderMode=cv2.BORDER_CONSTANT, borderValue=padding)
-    
+
     return patch

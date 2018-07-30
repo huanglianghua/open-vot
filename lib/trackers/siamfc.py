@@ -16,21 +16,30 @@ from ..utils.ioutil import load_siamfc_from_matconvnet
 from ..utils.warp import warp_cv2
 
 
+class BCEWeightedLogitsLoss(nn.Module):
+
+    def __init__(self):
+        super(BCEWeightedLogitsLoss, self).__init__()
+
+    def forward(self, input, target, weight=None):
+        return F.binary_cross_entropy_with_logits(
+            input, target, weight, size_average=True)
+
 class BCEWeightedLoss(nn.Module):
 
     def __init__(self):
         super(BCEWeightedLoss, self).__init__()
 
     def forward(self, input, target, weight=None):
-        return F.binary_cross_entropy_with_logits(
+        return F.binary_cross_entropy(
             input, target, weight, size_average=True)
-
 
 class TrackerSiamFC(Tracker):
 
     def __init__(self, branch='alexv1', net_path=None, **kargs):
         super(TrackerSiamFC, self).__init__('SiamFC')
         self.parse_args(**kargs)
+        self.norm_type = "cosine_similarity"
         self.cuda = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if self.cuda else 'cpu')
         self.setup_model(branch, net_path)
@@ -71,9 +80,9 @@ class TrackerSiamFC(Tracker):
     def setup_model(self, branch='alexv1', net_path=None):
         assert branch in ['alexv1', 'alexv2']
         if branch == 'alexv1':
-            self.model = SiameseNet(AlexNetV1(), norm='linear')
+            self.model = SiameseNet(AlexNetV1(), norm=self.norm_type)
         elif branch == 'alexv2':
-            self.model = SiameseNet(AlexNetV2(), norm='bn')
+            self.model = SiameseNet(AlexNetV2(), norm=self.norm_type)
 
         if net_path is not None:
             ext = os.path.splitext(net_path)[1]
@@ -91,44 +100,18 @@ class TrackerSiamFC(Tracker):
         self.model = nn.DataParallel(self.model).to(self.device)
 
     def setup_optimizer(self):
-        params = []
-        for name, param in self.model.named_parameters():
-            lr = self.cfg.initial_lr
-            weight_decay = self.cfg.weight_decay
-            if '.0' in name:  # conv
-                if 'weight' in name:
-                    lr *= self.cfg.lr_mult_conv_weight
-                    weight_decay *= 1
-                elif 'bias' in name:
-                    lr *= self.cfg.lr_mult_conv_bias
-                    weight_decay *= 0
-            elif '.1' in name or 'bn' in name:  # bn
-                if 'weight' in name:
-                    lr *= self.cfg.lr_mult_bn_weight
-                    weight_decay *= 0
-                elif 'bias' in name:
-                    lr *= self.cfg.lr_mult_bn_bias
-                    weight_decay *= 0
-            elif 'linear' in name:
-                if 'weight' in name:
-                    lr *= self.cfg.lr_mult_linear_weight
-                    weight_decay *= 1
-                elif 'bias' in name:
-                    lr *= self.cfg.lr_mult_linear_bias
-                    weight_decay *= 0
-            params.append({
-                'params': param,
-                'initial_lr': lr,
-                'weight_decay': weight_decay})
 
         self.optimizer = optim.SGD(
-            params, lr=self.cfg.initial_lr,
+            self.model.parameters(), lr=self.cfg.initial_lr,
             weight_decay=self.cfg.weight_decay)
         gamma = (self.cfg.final_lr / self.cfg.initial_lr) ** \
             (1 / (self.cfg.epoch_num // self.cfg.step_size))
         self.scheduler = StepLR(
             self.optimizer, self.cfg.step_size, gamma=gamma)
-        self.criterion = BCEWeightedLoss().to(self.device)
+        if self.norm == "cosine_similarity":
+            self.criterion = BCEWeightedLoss().to(self.device)
+        else:
+            self.criterion = BCEWeightedLogitsLoss().to(self.device)
 
     def init(self, image, init_rect):
         if image.ndim == 3:
@@ -163,6 +146,8 @@ class TrackerSiamFC(Tracker):
                           self.cfg.exemplar_sz, self.avg_color)
         crop_z = torch.from_numpy(crop_z).to(
             self.device).permute(2, 0, 1).unsqueeze(0).float()
+        crop_z = (crop_z / 255.0 - 0.5) / 0.5
+
         with torch.set_grad_enabled(False):
             self.branch.eval()
             self.z = self.branch(crop_z)
@@ -182,12 +167,14 @@ class TrackerSiamFC(Tracker):
         crops_x = [warp_cv2(
             image, self.center, size, self.cfg.search_sz, self.avg_color)
             for size in scaled_search_area]
-        crops_x = torch.stack([torch.from_numpy(c).to(
-            self.device).permute(2, 0, 1).float()
+        crops_x = torch.stack([(torch.from_numpy(c).to(
+            self.device).permute(2, 0, 1).float() / 255.0 - 0.5) / 0.5
             for c in crops_x], dim=0)
+
         with torch.set_grad_enabled(False):
             self.branch.eval()
             x = self.branch(crops_x)
+        print(x.size(),self.z.size())
         score, scale_id = self._calc_score(self.z, x)
 
         self.x_sz = (1 - self.cfg.scale_lr) * self.x_sz + \
@@ -260,10 +247,16 @@ class TrackerSiamFC(Tracker):
         return score_sz, total_stride
 
     def _calc_score(self, z, x):
-        scores = F.conv2d(x, z)
-        with torch.set_grad_enabled(False):
-            self.norm.eval()
-            scores = self.norm(scores)
+        if self.norm_type != "cosine_similarity":
+            scores = F.conv2d(x, z)
+            print(x.size(),z.size(),scores.size())
+            with torch.set_grad_enabled(False):
+                self.norm.eval()
+                scores = self.norm(scores)
+        else:
+            with torch.set_grad_enabled(False):
+                self.norm.eval()
+                scores = self.norm(None, z, x)
 
         scores[:self.cfg.scale_num // 2] *= self.cfg.scale_penalty
         scores[self.cfg.scale_num // 2 + 1:] *= self.cfg.scale_penalty

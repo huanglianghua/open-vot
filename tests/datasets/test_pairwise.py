@@ -43,6 +43,7 @@ class TestPairwise(unittest.TestCase):
             item = random.choice(dataset)
             img_z, img_x, bndbox_z, bndbox_x = \
                 item[0], item[1], item[2], item[3]
+            print(bndbox_z)
             if return_index:
                 print('rand_z:', item[4], '\trand_x:', item[5])
             show_frame(img_z, bndbox_z, fig_n=1, pause=1)
