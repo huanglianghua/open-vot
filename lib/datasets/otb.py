@@ -5,55 +5,82 @@ import glob
 import numpy as np
 import io
 import six
+from itertools import chain
 
 from ..utils.ioutil import download, extract
 
 
 class OTB(object):
 
-    __otb50_seqs = ['BasketBall', 'Biker', 'Bird1', 'BlurBody', 'BlurCar2',
-                    'BlurFace', 'BlurOwl', 'Bolt', 'Box', 'Car1', 'Car4', 'CarDark',
-                    'CarScale', 'ClifBar', 'Couple', 'Crowds', 'David', 'Deer',
-                    'Diving', 'DragonBaby', 'Dudek', 'Football', 'Freeman4',
-                    'Girl', 'Human3', 'Human4-2', 'Human6', 'Human9', 'Ironman',
-                    'Jump', 'Jumping', 'Liquor', 'Matrix', 'MotorRolling', 'Panda',
-                    'RedTeam', 'Shaking', 'Singer2', 'Skating1', 'Skating2-1',
-                    'Skating2-2', 'Skiing', 'Soccer', 'Surfer', 'Sylvester',
-                    'Tiger2', 'Trellis', 'Walking', 'Walking2', 'Woman']
+    __otb13_seqs = ['Basketball', 'Bolt', 'Boy', 'Car4', 'CarDark',
+                    'CarScale', 'Coke', 'Couple', 'Crossing', 'David',
+                    'David2', 'David3', 'Deer', 'Dog1', 'Doll', 'Dudek',
+                    'FaceOcc1', 'FaceOcc2', 'Fish', 'FleetFace',
+                    'Football', 'Football1', 'Freeman1', 'Freeman3',
+                    'Freeman4', 'Girl', 'Ironman', 'Jogging', 'Jumping',
+                    'Lemming', 'Liquor', 'Matrix', 'Mhyang', 'MotorRolling',
+                    'MountainBike', 'Shaking', 'Singer1', 'Singer2',
+                    'Skating1', 'Skiing', 'Soccer', 'Subway', 'Suv',
+                    'Sylvester', 'Tiger1', 'Tiger2', 'Trellis', 'Walking',
+                    'Walking2', 'Woman']
 
-    __otb100_seqs = ['Basketball', 'Biker', 'Bird1', 'Bird2', 'BlurBody',
-                     'BlurCar1', 'BlurCar2', 'BlurCar3', 'BlurCar4', 'BlurFace',
-                     'BlurOwl', 'Board', 'Bolt', 'Bolt2', 'Box', 'Boy', 'Car1',
-                     'Car2', 'Car24', 'Car4', 'CarDark', 'CarScale', 'ClifBar',
-                     'Coke', 'Couple', 'Coupon', 'Crossing', 'Crowds', 'Dancer',
-                     'Dancer2', 'David', 'David2', 'David3', 'Deer', 'Diving',
-                     'Dog', 'Dog1', 'Doll', 'DragonBaby', 'Dudek', 'FaceOcc1',
-                     'FaceOcc2', 'Fish', 'FleetFace', 'Football', 'Football1',
-                     'Freeman1', 'Freeman3', 'Freeman4', 'Girl', 'Girl2', 'Gym',
-                     'Human2', 'Human3', 'Human4.2', 'Human5', 'Human6', 'Human7',
-                     'Human8', 'Human9', 'Ironman', 'Jogging.1', 'Jogging.2',
-                     'Jump', 'Jumping', 'KiteSurf', 'Lemming', 'Liquor', 'Man',
-                     'Matrix', 'Mhyang', 'MotorRolling', 'MountainBike', 'Panda',
-                     'RedTeam', 'Rubik', 'Shaking', 'Singer1', 'Singer2',
-                     'Skater', 'Skater2', 'Skating1', 'Skating2.1', 'Skating2.2',
-                     'Skiing', 'Soccer', 'Subway', 'Surfer', 'Suv', 'Sylvester',
-                     'Tiger1', 'Tiger2', 'Toy', 'Trans', 'Trellis', 'Twinnings',
-                     'Vase', 'Walking', 'Walking2', 'Woman']
+    __tb50_seqs = ['Basketball', 'Biker', 'Bird1', 'BlurBody', 'BlurCar2',
+                   'BlurFace', 'BlurOwl', 'Bolt', 'Box', 'Car1', 'Car4',
+                   'CarDark', 'CarScale', 'ClifBar', 'Couple', 'Crowds',
+                   'David', 'Deer', 'Diving', 'DragonBaby', 'Dudek',
+                   'Football', 'Freeman4', 'Girl', 'Human3', 'Human4',
+                   'Human6', 'Human9', 'Ironman', 'Jump', 'Jumping',
+                   'Liquor', 'Matrix', 'MotorRolling', 'Panda', 'RedTeam',
+                   'Shaking', 'Singer2', 'Skating1', 'Skating2', 'Skiing',
+                   'Soccer', 'Surfer', 'Sylvester', 'Tiger2', 'Trellis',
+                   'Walking', 'Walking2', 'Woman']
 
-    def __init__(self, root_dir, download=False, version=2015):
+    __tb100_seqs = ['Bird2', 'BlurCar1', 'BlurCar3', 'BlurCar4', 'Board',
+                    'Bolt2', 'Boy', 'Car2', 'Car24', 'Coke', 'Coupon',
+                    'Crossing', 'Dancer', 'Dancer2', 'David2', 'David3',
+                    'Dog', 'Dog1', 'Doll', 'FaceOcc1', 'FaceOcc2', 'Fish',
+                    'FleetFace', 'Football1', 'Freeman1', 'Freeman3',
+                    'Girl2', 'Gym', 'Human2', 'Human5', 'Human7', 'Human8',
+                    'Jogging', 'KiteSurf', 'Lemming', 'Man', 'Mhyang',
+                    'MountainBike', 'Rubik', 'Singer1', 'Skater',
+                    'Skater2', 'Subway', 'Suv', 'Tiger1', 'Toy', 'Trans',
+                    'Twinnings', 'Vase']
+
+    __otb15_seqs = __tb50_seqs + __tb100_seqs
+
+    __version_dict = {
+        2013: __otb13_seqs,
+        2015: __otb15_seqs,
+        'otb2013': __otb13_seqs,
+        'otb2015': __otb15_seqs,
+        'tb50': __tb50_seqs,
+        'tb100': __tb100_seqs}
+
+    def __init__(self, root_dir, version=2015, download=False):
         super(OTB, self).__init__()
+        assert version in self.__version_dict
+
         self.root_dir = root_dir
+        self.version = version
         if download:
-            self._download(self.root_dir, version)
+            self._download(root_dir, version)
+        self._check_integrity(root_dir, version)
 
-        if not self._check_integrity():
-            raise Exception('Dataset not found or corrupted. ' +
-                            'You can use download=True to download it.')
-
-        self.anno_files = sorted(glob.glob(
-            os.path.join(root_dir, '*/groundtruth_rect.txt')))
+        valid_seqs = self.__version_dict[version]
+        self.anno_files = list(chain.from_iterable(glob.glob(
+            os.path.join(root_dir, s, 'groundtruth*.txt')) for s in valid_seqs))
         self.seq_dirs = [os.path.dirname(f) for f in self.anno_files]
-        self.seq_names = [os.path.basename(s) for s in self.seq_dirs]
+        self.seq_names = [os.path.basename(d) for d in self.seq_dirs]
+
+        # in case some sequences may have multiple targets
+        renamed_seqs = []
+        for i, seq_name in enumerate(self.seq_names):
+            if self.seq_names.count(seq_name) == 1:
+                renamed_seqs.append(seq_name)
+            else:
+                ind = self.seq_names[:i + 1].count(seq_name)
+                renamed_seqs.append('%s-%d' % (seq_name, ind))
+        self.seq_names = renamed_seqs
 
     def __getitem__(self, index):
         if isinstance(index, six.string_types):
@@ -65,6 +92,7 @@ class OTB(object):
             os.path.join(self.seq_dirs[index], 'img/*.jpg')))
 
         # special sequences
+        # (visit http://cvlab.hanyang.ac.kr/tracker_benchmark/index.html for detail)
         seq_name = self.seq_names[index]
         if seq_name.lower() == 'david':
             img_files = img_files[300-1:770]
@@ -77,7 +105,7 @@ class OTB(object):
         elif seq_name.lower() == 'diving':
             img_files = img_files[:215]
 
-        # to deal with multiple delimeters
+        # to deal with different delimeters
         with open(self.anno_files[index], 'r') as f:
             anno = np.loadtxt(io.StringIO(f.read().replace(',', ' ')))
 
@@ -86,26 +114,39 @@ class OTB(object):
     def __len__(self):
         return len(self.seq_names)
 
-    def _check_integrity(self, root_dir=None):
-        if not root_dir:
-            root_dir = self.root_dir
-        return os.path.isdir(root_dir) and \
-            len(os.listdir(root_dir)) > 0
+    def _check_integrity(self, root_dir, version):
+        assert version in self.__version_dict
+        seq_names = self.__version_dict[version]
+
+        if os.path.isdir(root_dir) and len(os.listdir(root_dir)) > 0:
+            # check each sequence folder
+            for seq_name in seq_names:
+                seq_dir = os.path.join(root_dir, seq_name)
+                if not os.path.isdir(seq_dir):
+                    print('Warning: sequence %s not exist.' % seq_name)
+        else:
+            # dataset not exist
+            raise Exception('Dataset not found or corrupted. ' +
+                            'You can use download=True to download it.')
 
     def _download(self, root_dir, version):
-        if self._check_integrity(root_dir):
-            print('Files already downloaded.')
-            return
-        assert version in [2013, 2015]
+        assert version in self.__version_dict
+        seq_names = self.__version_dict[version]
 
         if not os.path.isdir(root_dir):
             os.makedirs(root_dir)
+        elif all([os.path.isdir(os.path.join(root_dir, s)) for s in seq_names]):
+            print('Files already downloaded.')
+            return
 
         url_fmt = 'http://cvlab.hanyang.ac.kr/tracker_benchmark/seq/%s.zip'
-        seqs = self.__otb50_seqs if version == 2013 else self.__otb100_seqs
-        for seq in seqs:
-            url = url_fmt % seq
-            zip_file = os.path.join(root_dir, seq + '.zip')
+        for seq_name in seq_names:
+            seq_dir = os.path.join(root_dir, seq_name)
+            if os.path.isdir(seq_dir):
+                continue
+            url = url_fmt % seq_name
+            zip_file = os.path.join(root_dir, seq_name + '.zip')
+            print('Downloading to %s...' % zip_file)
             download(url, zip_file)
             extract(zip_file, root_dir)
 

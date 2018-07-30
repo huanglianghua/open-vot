@@ -69,9 +69,9 @@ class TrackerMOSSE(Tracker):
 
     def _preprocess(self, img):
         img = np.log(np.float32(img) + 1.0)
-        img = (img-img.mean()) / (img.std() + self.eps)
+        img = (img - img.mean()) / (img.std() + self.eps)
 
-        return img*self.win
+        return img * self.win
 
     def _linear_correlation(self, img):
         C = cv2.mulSpectrums(
