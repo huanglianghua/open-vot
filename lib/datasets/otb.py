@@ -69,6 +69,7 @@ class OTB(object):
         valid_seqs = self.__version_dict[version]
         self.anno_files = list(chain.from_iterable(glob.glob(
             os.path.join(root_dir, s, 'groundtruth*.txt')) for s in valid_seqs))
+        self.anno_files = self._filter_files(self.anno_files)
         self.seq_dirs = [os.path.dirname(f) for f in self.anno_files]
         self.seq_names = [os.path.basename(d) for d in self.seq_dirs]
 
@@ -113,6 +114,17 @@ class OTB(object):
 
     def __len__(self):
         return len(self.seq_names)
+
+    def _filter_files(self, filenames):
+        filtered_files = []
+        for filename in filenames:
+            with open(filename, 'r') as f:
+                if f.read().strip() == '':
+                    print('Warning: %s is empty.' % filename)
+                else:
+                    filtered_files.append(filename)
+        
+        return filtered_files
 
     def _check_integrity(self, root_dir, version):
         assert version in self.__version_dict
