@@ -6,4 +6,5 @@ from .manager_csk import ManagerCSK
 from .manager_kcf import ManagerKCF
 from .manager_mosse import ManagerMOSSE
 from .manager_dcf import ManagerDCF
+from .manager_dcfnet import ManagerDCFNet
 from .manager_dsst import ManagerDSST
