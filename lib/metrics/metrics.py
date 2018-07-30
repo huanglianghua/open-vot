@@ -6,8 +6,8 @@ import numpy as np
 def center_error(rects1, rects2):
     r"""Center error.
     """
-    centers1 = rects1[:, :2] + rects1[:, 2:] / 2
-    centers2 = rects2[:, :2] + rects2[:, 2:] / 2
+    centers1 = rects1[:, :2] + (rects1[:, 2:] - 1) / 2
+    centers2 = rects2[:, :2] + (rects2[:, 2:] - 1) / 2
     ces = np.sqrt(np.sum(np.power(centers1 - centers2, 2), axis=1))
 
     return ces

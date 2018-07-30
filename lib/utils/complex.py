@@ -3,6 +3,7 @@ from __future__ import absolute_import
 import cv2
 import numpy as np
 import torch
+import numbers
 
 
 def real(img):
@@ -75,6 +76,16 @@ def ifft1(img):
         out = cv2.dft(img, flags=cv2.DFT_ROWS | cv2.DFT_SCALE)
     else:
         raise Exception('only supports 2 or 3 dimensional array')
+
+    return out
+
+
+def complex_add(a, b):
+    out = a.copy()
+    if isinstance(b, numbers.Number):
+        out[..., 0] += b
+    else:
+        out += b
 
     return out
 

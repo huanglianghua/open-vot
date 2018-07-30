@@ -5,7 +5,7 @@ import cv2
 
 from . import Tracker
 from ..utils import dict2tuple
-from ..utils.complex import real, conj, fft2, ifft2, fft1, ifft1, complex_mul, complex_div
+from ..utils.complex import real, conj, fft2, ifft2, fft1, ifft1, complex_add, complex_mul, complex_div
 from ..descriptors.fhog import fast_hog
 
 
@@ -207,14 +207,14 @@ class TrackerDSST(Tracker):
 
     def _calc_translation_score(self, xf, hf_num, hf_den):
         num = np.sum(complex_mul(hf_num, xf), axis=2)
-        den = hf_den + self.cfg.lambda_
+        den = complex_add(hf_den, self.cfg.lambda_)
         score = real(ifft2(complex_div(num, den)))
 
         return score
 
     def _calc_scale_score(self, xsf, sf_num, sf_den):
         num = np.sum(complex_mul(sf_num, xsf), axis=1, keepdims=True)
-        den = sf_den + self.cfg.lambda_
+        den = complex_add(sf_den, self.cfg.lambda_)
         score = real(ifft2(complex_div(num, den))).squeeze(1)
 
         return score

@@ -2,9 +2,9 @@
 *.pyc
 __pycache__/
 data
-cache
-pretrained
-logs
-results
-reports
+cache/
+pretrained/
+logs/
+results/
+reports/
 !.gitignore
