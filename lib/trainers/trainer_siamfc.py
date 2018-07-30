@@ -13,7 +13,7 @@ from ..utils import initialize_weights
 from ..transforms import TransformSiamFC
 
 
-class ManagerSiamFC(object):
+class TrainerSiamFC(object):
 
     def __init__(self, branch='alexv1', cfg_file=None):
         cfg = {}
@@ -27,55 +27,6 @@ class ManagerSiamFC(object):
         self.cfg = self.tracker.cfg
         self.logger = Logger(log_dir='logs/siamfc')
         self.cuda = torch.cuda.is_available()
-
-    def track(self, vot_dir, net_path=None, step=None, visualize=True):
-        tracker = self.tracker
-        if net_path is not None:
-            tracker.setup_model(self.branch, net_path)
-        dataset = VOT(vot_dir, return_rect=True, download=True)
-
-        tag = 'test' if step is None else 'test_%d' % (step + 1)
-
-        avg_iou = 0
-        avg_prec = 0
-        avg_speed = 0
-        total_frames = 0
-
-        for s, (img_files, anno) in enumerate(dataset):
-            seq_name = dataset.seq_names[s]
-
-            # tracking loop
-            rects, speed_fps = tracker.track(
-                img_files, anno[0, :], visualize=visualize)
-
-            mean_iou = iou(rects, anno).mean()
-            prec = (center_error(rects, anno) <= 20).sum() / len(anno)
-
-            frame_num = len(img_files)
-            avg_iou += mean_iou * frame_num
-            avg_prec += prec * frame_num
-            avg_speed += speed_fps * frame_num
-            total_frames += frame_num
-
-            # logging
-            self.logger.add_text(tag, '{}/{} Performance on {}: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f} fps'.format(
-                s + 1, len(dataset), seq_name, mean_iou, prec, speed_fps), step)
-            self.logger.add_scalar(tag + '/iou_' + seq_name, mean_iou, step)
-            self.logger.add_scalar(tag + '/prec_' + seq_name, prec, step)
-            self.logger.add_scalar(tag + '/speed_' + seq_name, speed_fps, step)
-
-        avg_iou /= total_frames
-        avg_prec /= total_frames
-        avg_speed /= total_frames
-
-        # logging
-        self.logger.add_text(tag, 'Overall Performance: IoU: {:.3f} Prec: {:.3f} Speed: {:.3f} fps'.format(
-            avg_iou, avg_prec, avg_speed), step)
-        self.logger.add_scalar(tag + '/iou_overall', avg_iou, step)
-        self.logger.add_scalar(tag + '/prec_overall', avg_prec, step)
-        self.logger.add_scalar(tag + '/speed_overall', avg_speed, step)
-
-        return avg_iou, avg_prec, avg_speed
 
     def train(self, vid_dir, stats_path=None, vot_dir=None):
         tracker = self.tracker
