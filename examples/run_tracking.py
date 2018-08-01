@@ -53,7 +53,7 @@ else:
 experiment = experiment_factory[args.experiment](args.dataset_folder)
 
 # run experiment and record results in 'results' folder
-experiment.run(tracker, visualize=False)
+experiment.run(tracker, visualize=True)
 
 # report performance in 'reports' folder
 experiment.report([tracker.name])

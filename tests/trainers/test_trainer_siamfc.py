@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import unittest
 import random
 
-from lib.managers import ManagerSiamFC
+from lib.trainers import TrainerSiamFC
 
 
 class TestManagerSiamFC(unittest.TestCase):
@@ -15,16 +15,13 @@ class TestManagerSiamFC(unittest.TestCase):
         self.vid_dir = 'data/ILSVRC'
         self.net_path = 'pretrained/siamfc/2016-08-17.net.mat'
         self.stats_path = 'pretrained/siamfc/cfnet_ILSVRC2015.stats.mat'
-        self.manager = ManagerSiamFC(self.branch, self.cfg_file)
+        self.trainer = TrainerSiamFC(self.branch, self.cfg_file)
 
     def tearDown(self):
         pass
 
-    def test_track(self):
-        self.manager.track(self.vot_dir, self.net_path)
-
     def test_train(self):
-        self.manager.train(self.vid_dir, self.stats_path, self.vot_dir)
+        self.trainer.train(self.vid_dir, self.stats_path, self.vot_dir)
 
 
 if __name__ == '__main__':

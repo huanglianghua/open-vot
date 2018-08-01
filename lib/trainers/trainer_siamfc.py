@@ -5,51 +5,54 @@ import torch
 import multiprocessing
 from torch.utils.data import DataLoader
 
-from ..trackers import TrackerDCFNet
+from ..trackers import TrackerSiamFC
 from ..utils.logger import Logger
 from ..datasets import VOT, ImageNetVID, Pairwise
 from ..metrics import iou, center_error
-from ..transforms import TransformDCFNet
-from lib.utils.viz import show_frame
-import unittest
-import random
-from torchvision import transforms
+from ..utils import initialize_weights
+from ..transforms import TransformSiamFC
 
 
-class ManagerDCFNet(object):
+class TrainerSiamFC(object):
 
-    def __init__(self, cfg_file=None):
+    def __init__(self, branch='alexv1', cfg_file=None):
         cfg = {}
         if cfg_file is not None:
             with open(cfg_file, 'r') as f:
                 cfg = json.load(f)
+            cfg = cfg[branch]
 
-        self.tracker = TrackerDCFNet(**cfg)
+        self.branch = branch
+        self.tracker = TrackerSiamFC(branch=branch, net_path=None, **cfg)
         self.cfg = self.tracker.cfg
-        self.logger = Logger(log_dir='logs/dcfnet')
+        self.logger = Logger(log_dir='logs/siamfc')
+        self.cuda = torch.cuda.is_available()
 
-    def train(self, vid_dir, stats_path=None):
-
-        transform = TransformDCFNet(stats_path, **self.cfg._asdict())
+    def train(self, vid_dir, stats_path=None, vot_dir=None):
+        tracker = self.tracker
+        initialize_weights(tracker.model)
+        transform = TransformSiamFC(stats_path, **self.cfg._asdict())
 
         epoch_num = self.cfg.epoch_num
         cpu_num = multiprocessing.cpu_count()
 
+        if vot_dir is not None:
+            vot_dataset = VOT(vot_dir, return_rect=True, download=True)
         base_dataset = ImageNetVID(vid_dir, return_rect=True)
 
         # training dataset
         dataset_train = Pairwise(
-            base_dataset, transform, subset='train', causal=True)
+            base_dataset, transform, subset='train')
         dataloader_train = DataLoader(
-            dataset_train, batch_size=self.cfg.batch_size*self.tracker.gpu_num, shuffle=True,
-            pin_memory=True, drop_last=True, num_workers=cpu_num)
+            dataset_train, batch_size=self.cfg.batch_size, shuffle=True,
+            pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
 
         # validation dataset
         dataset_val = Pairwise(
             base_dataset, transform, subset='val')
         dataloader_val = DataLoader(
-            dataset_val, batch_size=self.cfg.batch_size*self.tracker.gpu_num, shuffle=False,
-            pin_memory=True, drop_last=True, num_workers=cpu_num)
+            dataset_val, batch_size=self.cfg.batch_size, shuffle=False,
+            pin_memory=self.cuda, drop_last=True, num_workers=cpu_num)
 
         train_iters = len(dataloader_train)
         val_iters = len(dataloader_val)
@@ -59,8 +62,7 @@ class ManagerDCFNet(object):
             loss_epoch = 0
 
             for it, batch in enumerate(dataloader_train):
-
-                loss = self.tracker.step(batch, update_lr=(it == 0))
+                loss = tracker.step(batch, update_lr=(it == 0))
                 loss_epoch += loss
 
                 # logging
@@ -80,7 +82,7 @@ class ManagerDCFNet(object):
             loss_val = 0
 
             for it, batch in enumerate(dataloader_val):
-                loss = self.tracker.step(batch, backward=False)
+                loss = tracker.step(batch, backward=False)
                 loss_val += loss
 
             loss_val /= val_iters
@@ -90,7 +92,13 @@ class ManagerDCFNet(object):
                 epoch + 1, epoch_num, loss_val), epoch)
             self.logger.add_scalar('train/val_epoch_loss', loss_val, epoch)
 
+            # tracking loop if vot_dir is available
+            if vot_dir is not None:
+                self.track(vot_dir, visualize=False)
+
             # add checkpoint
-            self.logger.add_checkpoint('dcfnet', self.tracker.model.module.state_dict(), epoch)
+            self.logger.add_checkpoint(
+                'siamfc', self.tracker.model.module.state_dict(),
+                (epoch + 1) // 100 + 1)
 
         return tracker

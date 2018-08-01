@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import cv2
 import numpy as np
@@ -22,8 +22,8 @@ class Tracker(object):
         frame_num = len(img_files)
         bndboxes = np.zeros((frame_num, 4))
         bndboxes[0, :] = init_rect
+        speed_fps = np.zeros(frame_num)
 
-        elapsed_time = 0
         for f, img_file in enumerate(img_files):
             image = cv2.imread(img_file)
             if image.ndim == 2:
@@ -36,11 +36,11 @@ class Tracker(object):
                 self.init(image, init_rect)
             else:
                 bndboxes[f, :] = self.update(image)
-            elapsed_time += time.time() - start_time
+            elapsed_time = time.time() - start_time
+            speed_fps[f] = 1. / elapsed_time
 
             if visualize:
                 show_frame(image, bndboxes[f, :], fig_n=1)
-        speed_fps = frame_num / elapsed_time
 
         return bndboxes, speed_fps
 
