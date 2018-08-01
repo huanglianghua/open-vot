@@ -14,12 +14,6 @@ from ..utils import dict2tuple
 from ..models import DCFNet, DCFNetOnline
 from ..utils.warp import warp_cv2
 
-# def gaussian_shaped_labels(sigma, sz):
-#     x, y = np.meshgrid(np.arange(0, sz[0]) - np.floor(float(sz[0]) / 2), np.arange(0, sz[1]) - np.floor(float(sz[1]) / 2))
-#     d = x ** 2 + y ** 2
-#     g = np.exp(-0.5 / (sigma ** 2) * d)
-#     return g.astype(np.float32)
-
 def gaussian_shaped_labels(sigma, sz):
     x, y = np.meshgrid(np.arange(1, sz[0]+1) - np.floor(float(sz[0]) / 2), np.arange(1, sz[1]+1) - np.floor(float(sz[1]) / 2))
     d = x ** 2 + y ** 2
@@ -94,11 +88,7 @@ class TrackerDCFNet(Tracker):
         self.target = torch.Tensor(self.cfg.y).cuda().unsqueeze(0).unsqueeze(0).repeat(self.cfg.batch_size * self.gpu_num, 1, 1, 1)
 
     def load_param(self, path='param.pth'):
-        # state_dict = torch.load(
-        #     '/data/panhe/summer/DCFNet_pytorch/track/param.pth', map_location=lambda storage, loc: storage)
-        # self.model.load_state_dict(state_dict)
-
-        checkpoint = torch.load('/data/panhe/summer/DCFNet_pytorch/track/param.pth')
+        checkpoint = torch.load(path)
         if 'state_dict' in checkpoint.keys():  # from training result
             state_dict = checkpoint['state_dict']
             if 'module' in state_dict.keys()[0]:  # train with nn.DataParallel
@@ -137,6 +127,8 @@ class TrackerDCFNet(Tracker):
         # get feature size and initialize hanning window
         if image.ndim == 2:
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         target = warp_cv2(image, self.target_pos, self.padded_sz,
                           self.cfg.net_input_size, (0, 0, 0))
@@ -155,6 +147,8 @@ class TrackerDCFNet(Tracker):
 
         if image.ndim == 2:
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
         for i in range(self.cfg.num_scale):  # crop multi-scale search region
             window_sz = self.target_sz * (self.cfg.scale_factor[i] * (1 + self.cfg.padding))
@@ -171,8 +165,6 @@ class TrackerDCFNet(Tracker):
         best_scale = np.argmax(peak)
         r_max, c_max = np.unravel_index(idx[best_scale], self.cfg.net_input_size)
 
-        # r_max = r_max - self.cfg.net_input_size[0] / 2
-        # c_max = c_max - self.cfg.net_input_size[1] / 2
         if r_max > self.cfg.net_input_size[0] / 2:
             r_max = r_max - self.cfg.net_input_size[0]
         if c_max > self.cfg.net_input_size[1] / 2:

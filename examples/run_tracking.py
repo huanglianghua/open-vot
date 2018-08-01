@@ -14,7 +14,8 @@ tracker_factory = {
     'dsst': TrackerDSST,
     'goturn': TrackerGOTURN,
     'siamfc': TrackerSiamFC,
-    'siamfcv2': TrackerSiamFC}
+    'siamfcv2': TrackerSiamFC,
+    'dcfnet': TrackerDCFNet}
 
 experiment_factory = {
     'otb': ExperimentOTB}
@@ -30,7 +31,7 @@ parser.add_argument('-n', '--network-path', type=str,
 args = parser.parse_args()
 
 # setup tracker
-if not args.tracker in ['goturn', 'siamfc', 'siamfcv2']:
+if not args.tracker in ['goturn', 'siamfc', 'siamfcv2', 'dcfnet']:
     # traditional tracker
     tracker = tracker_factory[args.tracker]()
 else:
@@ -41,6 +42,9 @@ else:
     elif args.tracker == 'siamfcv2':
         tracker = tracker_factory[args.tracker](
             branch='alexv2', net_path=args.network_path)
+    elif args.tracker == 'dcfnet':
+        tracker = tracker_factory[args.tracker](
+            net_path=args.network_path, online=True)
     else:
         tracker = tracker_factory[args.tracker](
             net_path=args.network_path)
@@ -49,7 +53,7 @@ else:
 experiment = experiment_factory[args.experiment](args.dataset_folder)
 
 # run experiment and record results in 'results' folder
-experiment.run(tracker, visualize=True)
+experiment.run(tracker, visualize=False)
 
 # report performance in 'reports' folder
 experiment.report([tracker.name])
