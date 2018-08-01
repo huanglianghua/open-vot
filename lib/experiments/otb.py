@@ -17,6 +17,8 @@ class ExperimentOTB(object):
         self.dataset = OTB(otb_dir, version, download=True)
         self.result_dir = os.path.join(result_dir, 'OTB-' + str(version))
         self.report_dir = os.path.join(report_dir, 'OTB-' + str(version))
+        # as nbins_iou increases, the success score
+        # converges to average overlap (AO)
         self.nbins_iou = 101
         self.nbins_ce = 51
 
@@ -44,8 +46,10 @@ class ExperimentOTB(object):
 
         performance = {}
         for name in tracker_names:
-            succ_curve = None
-            prec_curve = None
+            seq_num = len(self.dataset)
+            succ_curve = np.zeros((seq_num, self.nbins_iou))
+            prec_curve = np.zeros((seq_num, self.nbins_ce))
+            speed_fps = np.zeros(seq_num)
 
             for s, (_, anno) in enumerate(self.dataset):
                 seq_name = self.dataset.seq_names[s]
@@ -56,31 +60,34 @@ class ExperimentOTB(object):
 
                 if len(rects) > len(anno):
                     rects = rects[:len(anno)]
-                elif len(rects) < len(anno):
-                    anno = anno[5:]
                 assert len(rects) == len(anno)
 
                 ious = iou(rects, anno)
                 center_errors = center_error(rects, anno)
+                succ_curve[s], prec_curve[s] = self._calc_curves(ious, center_errors)
 
-                succ_curve_, prec_curve_ = self._calc_curves(ious, center_errors)
-                if succ_curve is None:
-                    succ_curve = succ_curve_
-                    prec_curve = prec_curve_
-                else:
-                    succ_curve += succ_curve_
-                    prec_curve += prec_curve_
+                # calculate average tracking speed
+                speed_file = os.path.join(
+                    self.result_dir, name, 'FPS/%s.txt' % seq_name)
+                if os.path.isfile(speed_file):
+                    speeds = np.loadtxt(speed_file)
+                    speed_fps[s] = np.mean(speeds)
 
-            succ_curve /= len(self.dataset)
-            prec_curve /= len(self.dataset)
+            succ_curve = np.mean(succ_curve, axis=0)
+            prec_curve = np.mean(prec_curve, axis=0)
             succ_score = np.mean(succ_curve)
             prec_score = prec_curve[20]
+            if np.count_nonzero(speed_fps) > 0:
+                speed_fps = np.sum(speed_fps) / np.count_nonzero(speed_fps)
+            else:
+                speed_fps = None
 
             performance.update({name: {
                 'success_curve': succ_curve.tolist(),
                 'precision_curve': prec_curve.tolist(),
                 'success_score': succ_score,
-                'precision_score': prec_score}})
+                'precision_score': prec_score,
+                'speed_fps': speed_fps}})
 
         # report the performance
         report_file = os.path.join(report_dir, 'performance.json')
@@ -91,12 +98,20 @@ class ExperimentOTB(object):
         return performance
 
     def _record(self, tracker_name, seq_name, rects, speed_fps):
+        # record bounding boxes
         record_dir = os.path.join(self.result_dir, tracker_name)
         if not os.path.isdir(record_dir):
             os.makedirs(record_dir)
         record_file = os.path.join(record_dir, '%s.txt' % seq_name)
         np.savetxt(record_file, rects, fmt='%.3f', delimiter=',')
         print('  Results recorded at', record_file)
+
+        # record speeds
+        speed_dir = os.path.join(record_dir, 'FPS')
+        if not os.path.isdir(speed_dir):
+            os.makedirs(speed_dir)
+        speed_file = os.path.join(speed_dir, '%s.txt' % seq_name)
+        np.savetxt(speed_file, speed_fps, fmt='%.3f')
 
     def _calc_curves(self, ious, center_errors):
         ious = np.asarray(ious, float)[:, np.newaxis]
