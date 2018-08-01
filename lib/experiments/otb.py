@@ -21,7 +21,7 @@ class ExperimentOTB(object):
         # converges to average overlap (AO)
         self.nbins_iou = 101
         self.nbins_ce = 51
-    
+
     def run(self, tracker, visualize=False):
         print('Running tracker %s on OTB...' % tracker.name)
 
@@ -43,7 +43,7 @@ class ExperimentOTB(object):
         report_dir = os.path.join(self.report_dir, tracker_names[0])
         if not os.path.isdir(report_dir):
             os.makedirs(report_dir)
-        
+
         performance = {}
         for name in tracker_names:
             seq_num = len(self.dataset)
@@ -72,7 +72,7 @@ class ExperimentOTB(object):
                 if os.path.isfile(speed_file):
                     speeds = np.loadtxt(speed_file)
                     speed_fps[s] = np.mean(speeds)
-            
+
             succ_curve = np.mean(succ_curve, axis=0)
             prec_curve = np.mean(prec_curve, axis=0)
             succ_score = np.mean(succ_curve)
@@ -125,7 +125,7 @@ class ExperimentOTB(object):
 
         succ_curve = np.mean(bin_iou, axis=0)
         prec_curve = np.mean(bin_ce, axis=0)
-        
+
         return succ_curve, prec_curve
 
     def _visualize(self, performance, report_dir):
@@ -146,7 +146,7 @@ class ExperimentOTB(object):
         ax.legend(lines, legends, loc=1)
         ax.set(xlabel='Overlap threshold', ylabel='Success rate',
                xlim=(0, 1), ylim=(0, None), title='Success plots of OPE')
-        
+
         fig.savefig(succ_file, dpi=300)
         plt.draw()
         plt.pause(.001)
@@ -163,7 +163,7 @@ class ExperimentOTB(object):
         ax.legend(lines, legends, loc=2)
         ax.set(xlabel='Location error threshold', ylabel='Precision',
                xlim=(0, 50), ylim=(0, None), title='Precision plots of OPE')
-        
+
         fig.savefig(prec_file, dpi=300)
         plt.draw()
         plt.pause(1)

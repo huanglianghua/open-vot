@@ -123,7 +123,7 @@ class OTB(object):
                     print('Warning: %s is empty.' % filename)
                 else:
                     filtered_files.append(filename)
-        
+
         return filtered_files
 
     def _check_integrity(self, root_dir, version):
