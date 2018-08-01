@@ -153,5 +153,5 @@ def warp_cv2(image, center, size, out_size, padding):
     patch = cv2.warpAffine(
         image, affine, tuple(out_size), flags=cv2.INTER_CUBIC,
         borderMode=cv2.BORDER_CONSTANT, borderValue=padding)
-    
+
     return patch

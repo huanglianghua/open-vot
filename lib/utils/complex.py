@@ -2,6 +2,7 @@ from __future__ import absolute_import
 
 import cv2
 import numpy as np
+import torch
 import numbers
 import torch
 
@@ -121,7 +122,7 @@ def tensor_complex_mulconj(x, z):
     out_imag = x[..., 1] * z[..., 0] - x[..., 0] * z[..., 1]
     return torch.stack((out_real, out_imag), -1)
 
-def tensor_complex_conj(x):
+def tensor_complex_conj(x): 
     out_real = x[..., 0]
     out_imag = -1*x[..., 1]
     return torch.stack((out_real, out_imag), -1)
