@@ -4,32 +4,44 @@ import numpy as np
 import cv2
 
 from . import Tracker
+from ..utils import dict2tuple
 from ..utils.complex import complex_div
 
 
 class TrackerMOSSE(Tracker):
 
-    def __init__(self):
+    def __init__(self, **kargs):
         super(TrackerMOSSE, self).__init__('MOSSE')
-        self.eps = 1e-5
+        self.parse_args(**kargs)
 
-    def init(self, frame, rect):
-        if frame.ndim == 3:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    def parse_args(self, **kargs):
+        self.cfg = {
+            'psr_thr': 8.0,
+            'interp_factor': 0.125,
+            'sigma': 2.0,
+            'eps': 1e-5}
 
-        rect = rect.astype(int)
-        rect[2:] += rect[:2]
-        x1, y1, x2, y2 = rect
+        for key, val in kargs.items():
+            self.cfg.update({key: val})
+        self.cfg = dict2tuple(self.cfg)
+
+    def init(self, image, init_rect):
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        init_rect = init_rect.astype(int)
+        init_rect[2:] += init_rect[:2]
+        x1, y1, x2, y2 = init_rect
         w, h = map(cv2.getOptimalDFTSize, [x2 - x1, y2 - y1])
         x1, y1 = (x1 + x2 - w) // 2, (y1 + y2 - h) // 2
         self.t_center = x, y = x1 + 0.5 * (w - 1), y1 + 0.5 * (h - 1)
         self.t_sz = w, h
-        img = cv2.getRectSubPix(frame, (w, h), (x, y))
+        img = cv2.getRectSubPix(image, (w, h), (x, y))
 
         self.win = cv2.createHanningWindow((w, h), cv2.CV_32F)
         g = np.zeros((h, w), np.float32)
         g[h // 2, w // 2] = 1
-        g = cv2.GaussianBlur(g, (-1, -1), 2.0)
+        g = cv2.GaussianBlur(g, (-1, -1), self.cfg.sigma)
         g /= g.max()
 
         self.G = cv2.dft(g, flags=cv2.DFT_COMPLEX_OUTPUT)
@@ -41,35 +53,38 @@ class TrackerMOSSE(Tracker):
             self.A += cv2.mulSpectrums(self.G, F, 0, conjB=True)
             self.B += cv2.mulSpectrums(F, F, 0, conjB=True)
         self._update_kernel()
-        self.update(frame)
+        self.update(image)
 
-    def update(self, frame, rate=0.125):
-        if frame.ndim == 3:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    def update(self, image):
+        if image.ndim == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         (x, y), (w, h) = self.t_center, self.t_sz
-        self.last_img = img = cv2.getRectSubPix(frame, (w, h), (x, y))
+        self.last_img = img = cv2.getRectSubPix(image, (w, h), (x, y))
         img = self._preprocess(img)
         self.last_resp, (dx, dy), self.psr = self._linear_correlation(img)
-        self.good = self.psr > 8.0
+        self.good = self.psr > self.cfg.psr_thr
 
         if self.good:
             self.t_center = x + dx, y + dy
-            self.last_img = img = cv2.getRectSubPix(frame, (w, h), self.t_center)
+            self.last_img = img = cv2.getRectSubPix(
+                image, (w, h), self.t_center)
             img = self._preprocess(img)
 
             F = cv2.dft(img, flags=cv2.DFT_COMPLEX_OUTPUT)
             A = cv2.mulSpectrums(self.G, F, 0, conjB=True)
             B = cv2.mulSpectrums(F, F, 0, conjB=True)
-            self.A = self.A * (1.0-rate) + A * rate
-            self.B = self.B * (1.0-rate) + B * rate
+            self.A = self.A * (1.0 - self.cfg.interp_factor) + \
+                A * self.cfg.interp_factor
+            self.B = self.B * (1.0 - self.cfg.interp_factor) + \
+                B * self.cfg.interp_factor
             self._update_kernel()
 
         return np.array([x - 0.5 * (w - 1), y - 0.5 * (h - 1), w, h])
 
     def _preprocess(self, img):
         img = np.log(np.float32(img) + 1.0)
-        img = (img - img.mean()) / (img.std() + self.eps)
+        img = (img - img.mean()) / (img.std() + self.cfg.eps)
 
         return img * self.win
 
@@ -82,7 +97,7 @@ class TrackerMOSSE(Tracker):
         side_resp = resp.copy()
         cv2.rectangle(side_resp, (mx - 5, my - 5), (mx + 5, my + 5), 0, -1)
         smean, sstd = side_resp.mean(), side_resp.std()
-        psr = (mval - smean) / (sstd + self.eps)
+        psr = (mval - smean) / (sstd + self.cfg.eps)
 
         return resp, (mx - w // 2, my - h // 2), psr
 

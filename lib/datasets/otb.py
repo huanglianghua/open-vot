@@ -69,19 +69,14 @@ class OTB(object):
         valid_seqs = self.__version_dict[version]
         self.anno_files = list(chain.from_iterable(glob.glob(
             os.path.join(root_dir, s, 'groundtruth*.txt')) for s in valid_seqs))
+        # remove empty annotation files
+        # (e.g., groundtruth_rect.1.txt of Human4)
         self.anno_files = self._filter_files(self.anno_files)
         self.seq_dirs = [os.path.dirname(f) for f in self.anno_files]
         self.seq_names = [os.path.basename(d) for d in self.seq_dirs]
-
-        # in case some sequences may have multiple targets
-        renamed_seqs = []
-        for i, seq_name in enumerate(self.seq_names):
-            if self.seq_names.count(seq_name) == 1:
-                renamed_seqs.append(seq_name)
-            else:
-                ind = self.seq_names[:i + 1].count(seq_name)
-                renamed_seqs.append('%s-%d' % (seq_name, ind))
-        self.seq_names = renamed_seqs
+        # rename repeated sequence names
+        # (e.g., Jogging and Skating2)
+        self.seq_names = self._rename_seqs(self.seq_names)
 
     def __getitem__(self, index):
         if isinstance(index, six.string_types):
@@ -125,6 +120,18 @@ class OTB(object):
                     filtered_files.append(filename)
 
         return filtered_files
+
+    def _rename_seqs(self, seq_names):
+        # in case some sequences may have multiple targets
+        renamed_seqs = []
+        for i, seq_name in enumerate(seq_names):
+            if seq_names.count(seq_name) == 1:
+                renamed_seqs.append(seq_name)
+            else:
+                ind = seq_names[:i + 1].count(seq_name)
+                renamed_seqs.append('%s-%d' % (seq_name, ind))
+
+        return renamed_seqs
 
     def _check_integrity(self, root_dir, version):
         assert version in self.__version_dict
