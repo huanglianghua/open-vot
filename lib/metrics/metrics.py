@@ -31,6 +31,9 @@ def iou(rects1, rects2):
 
     area_union = areas1 + areas2 - area_inter
     ious = area_inter / (area_union + 1e-12)
+    
+    assert np.all(np.logical_and(ious >= 0 - 1e-6, ious <= 1 + 1e-6))
+    ious = np.clip(ious, 0, 1)
 
     return ious
 

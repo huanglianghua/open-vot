@@ -34,7 +34,6 @@ def _reporthook(count, block_size, total_size):
 
 def extract(filename, extract_dir):
     if os.path.splitext(filename)[1] == '.zip':
-        print('Extracting zip file...')
         if not os.path.isdir(extract_dir):
             os.makedirs(extract_dir)
         with zipfile.ZipFile(filename) as z:

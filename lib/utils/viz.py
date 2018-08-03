@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 
 
 def show_frame(image, bndbox=None, fig_n=1, pause=0.001,
-               thickness=5, cmap=None):
+               thickness=5, cmap=None, color=(255, 0, 0)):
     global fig_dict
     if not 'fig_dict' in globals():
         fig_dict = {}
@@ -17,7 +17,7 @@ def show_frame(image, bndbox=None, fig_n=1, pause=0.001,
     if bndbox is not None:
         image = image.copy()
         draw = ImageDraw.Draw(image)
-        color = (255, 0, 0) if image.mode == 'RGB' else 255
+        color = color if image.mode == 'RGB' else 255
         for t in range(-thickness // 2, thickness // 2 + 1):
             draw.rectangle((
                 int(bndbox[0] + t),

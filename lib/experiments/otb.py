@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+from __future__ import absolute_import, division
 
 import os
 import numpy as np
@@ -77,6 +77,7 @@ class ExperimentOTB(object):
             prec_curve = np.mean(prec_curve, axis=0)
             succ_score = np.mean(succ_curve)
             prec_score = prec_curve[20]
+            succ_rate = succ_curve[self.nbins_iou // 2]
             if np.count_nonzero(speed_fps) > 0:
                 speed_fps = np.sum(speed_fps) / np.count_nonzero(speed_fps)
             else:
@@ -87,6 +88,7 @@ class ExperimentOTB(object):
                 'precision_curve': prec_curve.tolist(),
                 'success_score': succ_score,
                 'precision_score': prec_score,
+                'success_rate': succ_rate,
                 'speed_fps': speed_fps}})
 
         # report the performance

@@ -10,22 +10,27 @@ from ..utils.ioutil import download, extract
 
 class VOT(object):
 
-    def __init__(self, root_dir, return_rect=False,
-                 download=False, version=2017):
+    __valid_versions = range(2013, 2017 + 1)
+
+    def __init__(self, root_dir, version=2017,
+                 anno_type='rect', download=True):
         super(VOT, self).__init__()
+        assert version in self.__valid_versions, 'Unsupport VOT version.'
+        assert anno_type in ['rect', 'corner'], 'Unknown annotation type.'
+
         self.root_dir = root_dir
-        self.return_rect = return_rect
+        self.version = version
+        self.anno_type = anno_type
         if download:
-            self._download(self.root_dir, version)
+            self._download(root_dir, version)
+        self._check_integrity(root_dir, version)
 
-        if not self._check_integrity():
-            raise Exception('Dataset not found or corrupted. ' +
-                            'You can use download=True to download it.')
-
-        self.anno_files = sorted(glob.glob(
-            os.path.join(root_dir, '*/groundtruth.txt')))
-        self.seq_dirs = [os.path.dirname(f) for f in self.anno_files]
-        self.seq_names = [os.path.basename(s) for s in self.seq_dirs]
+        list_file = os.path.join(root_dir, 'list.txt')
+        with open(list_file, 'r') as f:
+            self.seq_names = f.read().strip().split('\n')
+        self.seq_dirs = [os.path.join(root_dir, s) for s in self.seq_names]
+        self.anno_files = [os.path.join(s, 'groundtruth.txt')
+                           for s in self.seq_dirs]
 
     def __getitem__(self, index):
         if isinstance(index, six.string_types):
@@ -36,7 +41,9 @@ class VOT(object):
         img_files = sorted(glob.glob(
             os.path.join(self.seq_dirs[index], '*.jpg')))
         anno = np.loadtxt(self.anno_files[index], delimiter=',')
-        if self.return_rect and anno.shape[1] == 8:
+        assert len(img_files) == len(anno)
+        assert anno.shape[1] in [4, 8]
+        if self.anno_type == 'rect' and anno.shape[1] == 8:
             anno = self._corner2rect(anno)
 
         return img_files, anno
@@ -44,29 +51,47 @@ class VOT(object):
     def __len__(self):
         return len(self.seq_names)
 
-    def _check_integrity(self, root_dir=None):
-        if not root_dir:
-            root_dir = self.root_dir
-        return os.path.isdir(root_dir) and \
-            len(os.listdir(root_dir)) > 0
-
     def _download(self, root_dir, version):
-        if self._check_integrity(root_dir):
-            print('Files already downloaded.')
-            return
-        assert version in range(2013, 2017 + 1), 'Incorrect VOT version.'
+        assert version in self.__valid_versions
 
         if not os.path.isdir(root_dir):
             os.makedirs(root_dir)
+        elif os.path.isfile(os.path.join(root_dir, 'list.txt')):
+            with open(os.path.join(root_dir, 'list.txt')) as f:
+                seq_names = f.read().strip().split('\n')
+            if all([os.path.isdir(os.path.join(root_dir, s)) for s in seq_names]):
+                print('Files already downloaded.')
+                return
 
-        version = 'vot%d' % version
-        url = 'http://data.votchallenge.net/%s/%s.zip' % (version, version)
-        zip_file = os.path.join(root_dir, version + '.zip')
+        version_str = 'vot%d' % version
+        url = 'http://data.votchallenge.net/%s/%s.zip' % (
+            version_str, version_str)
+        zip_file = os.path.join(root_dir, version_str + '.zip')
 
+        print('Downloading to %s...' % zip_file)
         download(url, zip_file)
+        print('\nExtracting to %s...' % root_dir)
         extract(zip_file, root_dir)
 
         return root_dir
+
+    def _check_integrity(self, root_dir, version):
+        assert version in self.__valid_versions
+        list_file = os.path.join(root_dir, 'list.txt')
+
+        if os.path.isfile(list_file):
+            with open(list_file, 'r') as f:
+                seq_names = f.read().strip().split('\n')
+
+            # check each sequence folder
+            for seq_name in seq_names:
+                seq_dir = os.path.join(root_dir, seq_name)
+                if not os.path.isdir(seq_dir):
+                    print('Warning: sequence %s not exist.' % seq_name)
+        else:
+            # dataset not exist
+            raise Exception('Dataset not found or corrupted. ' +
+                            'You can use download=True to download it.')
 
     def _corner2rect(self, corners, center=False):
         cx = np.mean(corners[:, 0::2], axis=1)
@@ -87,4 +112,4 @@ class VOT(object):
         if center:
             return np.array([cx, cy, w, h]).T
         else:
-            return np.array([cx-w/2, cy-h/2, w, h]).T
+            return np.array([cx - w / 2, cy - h / 2, w, h]).T

@@ -56,7 +56,7 @@ class OTB(object):
         'tb50': __tb50_seqs,
         'tb100': __tb100_seqs}
 
-    def __init__(self, root_dir, version=2015, download=False):
+    def __init__(self, root_dir, version=2015, download=True):
         super(OTB, self).__init__()
         assert version in self.__version_dict
 
@@ -104,6 +104,8 @@ class OTB(object):
         # to deal with different delimeters
         with open(self.anno_files[index], 'r') as f:
             anno = np.loadtxt(io.StringIO(f.read().replace(',', ' ')))
+        assert len(img_files) == len(anno)
+        assert anno.shape[1] == 4
 
         return img_files, anno
 
@@ -133,21 +135,6 @@ class OTB(object):
 
         return renamed_seqs
 
-    def _check_integrity(self, root_dir, version):
-        assert version in self.__version_dict
-        seq_names = self.__version_dict[version]
-
-        if os.path.isdir(root_dir) and len(os.listdir(root_dir)) > 0:
-            # check each sequence folder
-            for seq_name in seq_names:
-                seq_dir = os.path.join(root_dir, seq_name)
-                if not os.path.isdir(seq_dir):
-                    print('Warning: sequence %s not exist.' % seq_name)
-        else:
-            # dataset not exist
-            raise Exception('Dataset not found or corrupted. ' +
-                            'You can use download=True to download it.')
-
     def _download(self, root_dir, version):
         assert version in self.__version_dict
         seq_names = self.__version_dict[version]
@@ -167,6 +154,22 @@ class OTB(object):
             zip_file = os.path.join(root_dir, seq_name + '.zip')
             print('Downloading to %s...' % zip_file)
             download(url, zip_file)
+            print('\nExtracting to %s...' % root_dir)
             extract(zip_file, root_dir)
 
         return root_dir
+
+    def _check_integrity(self, root_dir, version):
+        assert version in self.__version_dict
+        seq_names = self.__version_dict[version]
+
+        if os.path.isdir(root_dir) and len(os.listdir(root_dir)) > 0:
+            # check each sequence folder
+            for seq_name in seq_names:
+                seq_dir = os.path.join(root_dir, seq_name)
+                if not os.path.isdir(seq_dir):
+                    print('Warning: sequence %s not exist.' % seq_name)
+        else:
+            # dataset not exist
+            raise Exception('Dataset not found or corrupted. ' +
+                            'You can use download=True to download it.')
