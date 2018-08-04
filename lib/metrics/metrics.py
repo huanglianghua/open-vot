@@ -1,8 +1,7 @@
 from __future__ import absolute_import, division
 
 import numpy as np
-from shapely.geometry.polygon import LineString, LinearRing
-from shapely.geometry import box
+from shapely.geometry import box, Polygon
 
 
 def center_error(rects1, rects2):
@@ -50,12 +49,16 @@ def _intersection(rects1, rects2):
     return np.stack([x1, y1, w, h]).T
 
 
-def poly_iou(polys1, polys2):
+def poly_iou(polys1, polys2, bound=None):
     r"""Intersection over union of polygons.
     """
-    assert polys1.shape == polys2.shape
+    assert len(polys1) == len(polys2)
     polys1 = _to_poly(polys1)
     polys2 = _to_poly(polys2)
+    if bound is not None:
+        bound = box(0, 0, bound[0] - 1, bound[1] - 1)
+        polys1 = [p.intersection(bound) for p in polys1]
+        polys2 = [p.intersection(bound) for p in polys2]
 
     ious = []
     eps = np.finfo(float).eps
@@ -73,16 +76,12 @@ def _to_poly(arrays):
     def to_poly(array):
         if len(array) == 4:
             return box(array[0], array[1],
-                       array[0] + array[2],
-                       array[1] + array[3])
-        elif len(array) == 6:
-            return LinearRing([(array[2 * i], array[2 * i + 1])
-                               for i in range(3)])
+                       array[0] + array[2], array[1] + array[3])
         elif len(array) == 8:
-            return LineString([(array[2 * i], array[2 * i + 1])
-                               for i in range(4)])
+            return Polygon([(array[2 * i], array[2 * i + 1])
+                            for i in range(4)])
         else:
             raise Exception(
-                'Only 4, 6 and 8 dimensional array is supported.')
+                'Only 4, 6 or 8 dimensional array is supported.')
     
     return [to_poly(t) for t in arrays]

@@ -11,7 +11,7 @@ import ast
 from ..datasets.vot import VOT
 from ..utils import dict2tuple
 from ..utils.viz import show_frame
-from ..metrics import rect_iou
+from ..metrics import rect_iou, poly_iou
 
 
 class ExperimentVOT(object):
@@ -234,11 +234,12 @@ class ExperimentVOT(object):
                             state = tracker.update(img)
                             end = time.time()
 
-                            accum_time += max(1. / self.cfg.default_fps, end - start)
+                            accum_time += max(1. /
+                                              self.cfg.default_fps, end - start)
                             # calculate the next frame according to the realtime setting
                             next_frame = init_frame + round(np.floor(
                                 (accum_time + max(1. / self.cfg.default_fps, end - start)) * self.cfg.default_fps))
-                        
+
                         if rect_iou(state, anno[f]) > 0:
                             states.append(state)
                         else:
@@ -279,13 +280,24 @@ class ExperimentVOT(object):
                              states, elapsed_times)
 
     def report(self, tracker_names):
+        for e in self.cfg.experiments:
+            assert e in ('baseline', 'unsupervised', 'realtime')
+            if e == 'baseline':
+                self.report_baseline(tracker_names)
+            elif e == 'unsupervised':
+                self.report_unsupervised(tracker_names)
+            elif e == 'realtime':
+                self.report_realtime(tracker_names)
+
+    def report_baseline(self, tracker_names):
         assert isinstance(tracker_names, (list, tuple))
 
         # assume tracker_names[0] is your tracker
-        report_dir = os.path.join(self.report_dir, tracker_names[0])
+        report_dir = os.path.join(
+            self.report_dir, tracker_names[0], 'baseline')
         if not os.path.isdir(report_dir):
             os.makedirs(report_dir)
-        
+
         performance = {}
         for name in tracker_names:
             seq_num = len(self.dataset)
@@ -308,7 +320,7 @@ class ExperimentVOT(object):
                     assert(len(results) == len(anno))
                     seq_ious[r, :] = self._iou(results, anno)
                     seq_failures[r] = self._failure(results, anno)
-                
+
                 seq_ious = np.nanmean(seq_ious, axis=0)
                 seq_failures[np.isnan(seq_failures)] = np.nanmean(seq_failures)
 
@@ -334,6 +346,55 @@ class ExperimentVOT(object):
             json.dump(performance, f, indent=4)
 
         return performance
+
+    def report_unsupervised(self, tracker_names):
+        assert isinstance(tracker_names, (list, tuple))
+        print('Report performance of unsupervised experiment')
+
+        # assume tracker_names[0] is your tracker
+        report_dir = os.path.join(
+            self.report_dir, tracker_names[0], 'unsupervised')
+        if not os.path.isdir(report_dir):
+            os.makedirs(report_dir)
+
+        performance = {}
+        for name in tracker_names:
+            print('--Processing tracker %s...' % name)
+            ious = []
+
+            for s, (img_files, anno) in enumerate(self.dataset):
+                seq_name = self.dataset.seq_names[s]
+                seq_ious = np.full((1, len(anno) - 1), np.NaN, dtype=float)
+                bound = cv2.imread(img_files[0]).shape[1::-1]
+
+                record_files = sorted(glob.glob(os.path.join(
+                    self.result_dir, name, 'unsupervised', seq_name,
+                    '%s_[0-9]*.txt' % seq_name)))
+
+                for r, record_file in enumerate(record_files):
+                    results = self._read_record(record_file)
+                    assert len(results) == len(anno)
+                    seq_ious[r] = poly_iou(
+                        np.asarray(results[1:]), anno[1:], bound)
+
+                ious.append(np.nanmean(seq_ious, axis=0))
+
+            ious = np.concatenate(ious)
+            ious[np.isnan(ious)] = 0
+            avg_iou = ious.mean()
+
+            performance.update({name: {
+                'avg_iou': avg_iou}})
+
+        # report the performance
+        report_file = os.path.join(report_dir, 'performance.json')
+        with open(report_file, 'w') as f:
+            json.dump(performance, f, indent=4)
+
+        return performance
+
+    def report_realtime(self, tracker_names):
+        pass
 
     def _check_deterministic(self, experiment, tracker_name, seq_name):
         record_dir = os.path.join(
@@ -387,7 +448,7 @@ class ExperimentVOT(object):
             content = f.read().strip()
         states = [[ast.literal_eval(t) for t in line.split(',')]
                   for line in content.split('\n')]
-        
+
         return states
 
     def _iou(self, results, anno):
@@ -395,17 +456,19 @@ class ExperimentVOT(object):
         burnin = 10
 
         if burnin > 0:
-            mask = np.asarray([(len(t) == 1 and t[0] == 1) for t in results], dtype=np.uint8)
-            se = np.concatenate((np.zeros(burnin - 1), np.ones(burnin))).astype(np.uint8)
+            mask = np.asarray([(len(t) == 1 and t[0] == 1)
+                               for t in results], dtype=np.uint8)
+            se = np.concatenate(
+                (np.zeros(burnin - 1), np.ones(burnin))).astype(np.uint8)
             mask = cv2.dilate(mask[::-1], se).squeeze().astype(bool)[::-1]
         else:
             mask = np.zeros(len(results), dtype=bool)
-        
+
         ious = np.full(len(anno), np.NaN, dtype=float)
         for f, state in enumerate(results):
             if not mask[f] and len(state) > 1:
                 ious[f] = rect_iou(np.asarray(state), anno[f])
-        
+
         return ious
 
     def _failure(self, results, anno):
