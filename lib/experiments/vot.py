@@ -5,6 +5,8 @@ import cv2
 import time
 import numpy as np
 import glob
+import json
+import ast
 
 from ..datasets.vot import VOT
 from ..utils import dict2tuple
@@ -277,7 +279,72 @@ class ExperimentVOT(object):
                              states, elapsed_times)
 
     def report(self, tracker_names):
-        pass
+        assert isinstance(tracker_names, (list, tuple))
+
+        # assume tracker_names[0] is your tracker
+        report_dir = os.path.join(self.report_dir, tracker_names[0])
+        if not os.path.isdir(report_dir):
+            os.makedirs(report_dir)
+        
+        performance = {}
+        for name in tracker_names:
+            seq_num = len(self.dataset)
+            ious = []
+            failures = []
+
+            for s, (_, anno) in enumerate(self.dataset):
+                seq_name = self.dataset.seq_names[s]
+                seq_ious = np.full((15, len(anno)), np.NaN, dtype=float)
+                seq_failures = np.full(15, np.NaN, dtype=float)
+
+                record_files = sorted(glob.glob(os.path.join(
+                    self.result_dir, name, 'baseline', seq_name,
+                    '%s_[0-9]*.txt' % seq_name)))
+
+                for r, record_file in enumerate(record_files):
+                    results = self._read_record(record_file)
+                    assert(len(results) == len(anno))
+                    seq_ious[r, :] = self._iou(results, anno)
+                    seq_failures[r] = self._failure(results, anno)
+                
+                seq_ious = np.nanmean(seq_ious, axis=0)
+                seq_failures[np.isnan(seq_failures)] = np.nanmean(seq_failures)
+
+                if len(seq_ious) > 0:
+                    ious.append(seq_ious)
+                if len(seq_failures) > 0:
+                    failures.append(seq_failures)
+
+            failures = np.stack(failures, axis=0)
+            failures = failures[~np.isnan(failures[:, 0]), :]
+            avg_iou = np.nanmean(np.concatenate(ious))
+            avg_failure = np.nanmean(np.sum(failures, axis=0))
+
+            performance.update({name: {
+                'accuracy': avg_iou,
+                'robustness': avg_failure}})
+
+        # report the performance
+        report_file = os.path.join(report_dir, 'performance.json')
+        with open(report_file, 'w') as f:
+            json.dump(performance, f, indent=4)
+
+        return performance
+
+    def _check_deterministic(self, experiment, tracker_name, seq_name):
+        record_dir = os.path.join(
+            self.result_dir, tracker_name, experiment, seq_name)
+        record_files = sorted(glob.glob(os.path.join(
+            record_dir, '%s_[0-9]*.txt' % seq_name)))
+        if len(record_files) < self.cfg.min_repetitions:
+            return False
+
+        states = []
+        for record_file in record_files:
+            with open(record_file, 'r') as f:
+                states.append(f.read())
+
+        return len(set(states)) == 1
 
     def _record(self, experiment, tracker_name, seq_name, repetition,
                 states, elapsed_times):
@@ -311,17 +378,33 @@ class ExperimentVOT(object):
         content[:, repetition] = elapsed_times
         np.savetxt(time_file, content, fmt='%.6f', delimiter=',')
 
-    def _check_deterministic(self, experiment, tracker_name, seq_name):
-        record_dir = os.path.join(
-            self.result_dir, tracker_name, experiment, seq_name)
-        record_files = sorted(glob.glob(os.path.join(
-            record_dir, '%s_[0-9]*.txt' % seq_name)))
-        if len(record_files) < self.cfg.min_repetitions:
-            return False
+    def _read_record(self, record_file):
+        with open(record_file, 'r') as f:
+            content = f.read().strip()
+        states = [[ast.literal_eval(t) for t in line.split(',')]
+                  for line in content.split('\n')]
+        
+        return states
 
-        states = []
-        for record_file in record_files:
-            with open(record_file, 'r') as f:
-                states.append(f.read())
+    def _iou(self, results, anno):
+        assert len(results) == len(anno)
+        burnin = 10
 
-        return len(set(states)) == 1
+        if burnin > 0:
+            mask = np.asarray([(len(t) == 1 and t[0] == 1) for t in results], dtype=np.uint8)
+            se = np.concatenate((np.zeros(burnin - 1), np.ones(burnin))).astype(np.uint8)
+            mask = cv2.dilate(mask[::-1], se).squeeze().astype(bool)[::-1]
+        else:
+            mask = np.zeros(len(results), dtype=bool)
+        
+        ious = np.full(len(anno), np.NaN, dtype=float)
+        for f, state in enumerate(results):
+            if not mask[f] and len(state) > 1:
+                ious[f] = iou(np.asarray(state), anno[f])
+        
+        return ious
+
+    def _failure(self, results, anno):
+        failures = [t for t in results if len(t) == 1 and t[0] == 2]
+
+        return len(failures)

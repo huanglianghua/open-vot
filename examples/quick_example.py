@@ -1,13 +1,19 @@
 from __future__ import absolute_import
 
-from lib.trackers import TrackerCSK
-from lib.experiments import ExperimentOTB
+from lib.trackers import *
+from lib.experiments import ExperimentVOT
 
 
-otb_dir = 'data/OTB'
-experiment = ExperimentOTB(otb_dir, version=2013)
+tracker_factory = {
+    'MOSSE': TrackerMOSSE(),
+    'CSK': TrackerCSK(),
+    'KCF': TrackerKCF(),
+    'DCF': TrackerDCF()}
 
-tracker = TrackerCSK()
-experiment.run(tracker, visualize=True)
+vot_dir = 'data/vot2017'
+experiment = ExperimentVOT(vot_dir, version=2017)
 
-experiment.report([tracker.name])
+# for tracker in tracker_factory.values():
+#     experiment.run(tracker, visualize=False)
+
+experiment.report(list(tracker_factory.keys()))
