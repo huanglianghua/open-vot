@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from ..trackers import TrackerGOTURN
 from ..utils.logger import Logger
 from ..datasets import VOT, ImageNetVID, ImageNetObject, Pairwise
-from ..metrics import iou, center_error
+from ..metrics import rect_iou, center_error
 from ..utils import initialize_weights
 from ..transforms import TransformGOTURN
 

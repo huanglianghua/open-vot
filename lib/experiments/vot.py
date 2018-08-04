@@ -11,7 +11,7 @@ import ast
 from ..datasets.vot import VOT
 from ..utils import dict2tuple
 from ..utils.viz import show_frame
-from ..metrics import iou
+from ..metrics import rect_iou
 
 
 class ExperimentVOT(object):
@@ -98,7 +98,7 @@ class ExperimentVOT(object):
                     elif not failure:
                         # during success frames
                         state = tracker.update(img)
-                        if iou(state, anno[f]) == 0:  # tracking failure
+                        if rect_iou(state, anno[f]) == 0:  # tracking failure
                             failure = True
                             skipped_frames = 1
                             states.append([2])
@@ -239,7 +239,7 @@ class ExperimentVOT(object):
                             next_frame = init_frame + round(np.floor(
                                 (accum_time + max(1. / self.cfg.default_fps, end - start)) * self.cfg.default_fps))
                         
-                        if iou(state, anno[f]) > 0:
+                        if rect_iou(state, anno[f]) > 0:
                             states.append(state)
                         else:
                             states.append([2])
@@ -289,11 +289,13 @@ class ExperimentVOT(object):
         performance = {}
         for name in tracker_names:
             seq_num = len(self.dataset)
+            total_len = 0
             ious = []
             failures = []
 
             for s, (_, anno) in enumerate(self.dataset):
                 seq_name = self.dataset.seq_names[s]
+                total_len += len(anno)
                 seq_ious = np.full((15, len(anno)), np.NaN, dtype=float)
                 seq_failures = np.full(15, np.NaN, dtype=float)
 
@@ -319,10 +321,12 @@ class ExperimentVOT(object):
             failures = failures[~np.isnan(failures[:, 0]), :]
             avg_iou = np.nanmean(np.concatenate(ious))
             avg_failure = np.nanmean(np.sum(failures, axis=0))
+            avg_failure_rate = np.nanmean(np.sum(failures, axis=0) / total_len)
 
             performance.update({name: {
                 'accuracy': avg_iou,
-                'robustness': avg_failure}})
+                'failures': avg_failure,
+                'robustness': avg_failure_rate}})
 
         # report the performance
         report_file = os.path.join(report_dir, 'performance.json')
@@ -400,7 +404,7 @@ class ExperimentVOT(object):
         ious = np.full(len(anno), np.NaN, dtype=float)
         for f, state in enumerate(results):
             if not mask[f] and len(state) > 1:
-                ious[f] = iou(np.asarray(state), anno[f])
+                ious[f] = rect_iou(np.asarray(state), anno[f])
         
         return ious
 

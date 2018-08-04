@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import json
 
 from ..datasets.otb import OTB
-from ..metrics import iou, center_error
+from ..metrics import rect_iou, center_error
 
 
 class ExperimentOTB(object):
@@ -62,7 +62,7 @@ class ExperimentOTB(object):
                     rects = rects[:len(anno)]
                 assert len(rects) == len(anno)
 
-                ious = iou(rects, anno)
+                ious = rect_iou(rects, anno)
                 center_errors = center_error(rects, anno)
                 succ_curve[s], prec_curve[s] = self._calc_curves(ious, center_errors)
 

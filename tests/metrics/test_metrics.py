@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import unittest
 import numpy as np
 
-from lib.metrics import iou, center_error
+from lib.metrics import rect_iou, center_error
 
 
 class TestMetrics(unittest.TestCase):
@@ -16,11 +16,11 @@ class TestMetrics(unittest.TestCase):
         pass
 
     def test_iou(self):
-        ious = iou(self.rects1, self.rects2)
+        ious = rect_iou(self.rects1, self.rects2)
         self.assertGreater(ious.min(), 0 - 1e-12)
         self.assertLess(ious.max(), 1 + 1e-12)
 
-        ious = iou(self.rects1, self.rects1)
+        ious = rect_iou(self.rects1, self.rects1)
         self.assertAlmostEqual(ious.max(), 1)
         self.assertAlmostEqual(ious.min(), 1)
 

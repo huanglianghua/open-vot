@@ -1,39 +1,34 @@
 from __future__ import absolute_import, division
 
 import numpy as np
+from shapely.geometry.polygon import LineString, LinearRing
+from shapely.geometry import box
 
 
 def center_error(rects1, rects2):
     r"""Center error.
     """
-    centers1 = rects1[:, :2] + (rects1[:, 2:] - 1) / 2
-    centers2 = rects2[:, :2] + (rects2[:, 2:] - 1) / 2
-    ces = np.sqrt(np.sum(np.power(centers1 - centers2, 2), axis=1))
+    centers1 = rects1[..., :2] + (rects1[..., 2:] - 1) / 2
+    centers2 = rects2[..., :2] + (rects2[..., 2:] - 1) / 2
+    errors = np.sqrt(np.sum(np.power(centers1 - centers2, 2), axis=-1))
 
-    return ces
+    return errors
 
 
-def iou(rects1, rects2):
+def rect_iou(rects1, rects2):
     r"""Intersection over union.
     """
+    assert rects1.shape == rects2.shape
     rects_inter = _intersection(rects1, rects2)
+    areas_inter = np.prod(rects_inter[..., 2:], axis=-1)
 
-    if rects1.ndim == 1:
-        areas1 = np.prod(rects1[2:])
-        areas2 = np.prod(rects2[2:])
-        area_inter = np.prod(rects_inter[2:])
-    elif rects1.ndim == 2:
-        areas1 = np.prod(rects1[:, 2:], axis=1)
-        areas2 = np.prod(rects2[:, 2:], axis=1)
-        area_inter = np.prod(rects_inter[:, 2:], axis=1)
-    else:
-        raise Exception('Wrong dimension of rects!')
+    areas1 = np.prod(rects1[..., 2:], axis=-1)
+    areas2 = np.prod(rects2[..., 2:], axis=-1)
+    areas_union = areas1 + areas2 - areas_inter
 
-    area_union = areas1 + areas2 - area_inter
-    ious = area_inter / (area_union + 1e-12)
-    
-    assert np.all(np.logical_and(ious >= 0 - 1e-6, ious <= 1 + 1e-6))
-    ious = np.clip(ious, 0, 1)
+    eps = np.finfo(float).eps
+    ious = areas_inter / (areas_union + eps)
+    ious = np.clip(ious, 0.0, 1.0)
 
     return ious
 
@@ -42,26 +37,52 @@ def _intersection(rects1, rects2):
     r"""Rectangle intersection.
     """
     assert rects1.shape == rects2.shape
+    x1 = np.maximum(rects1[..., 0], rects2[..., 0])
+    y1 = np.maximum(rects1[..., 1], rects2[..., 1])
+    x2 = np.minimum(rects1[..., 0] + rects1[..., 2],
+                    rects2[..., 0] + rects2[..., 2])
+    y2 = np.minimum(rects1[..., 1] + rects1[..., 3],
+                    rects2[..., 1] + rects2[..., 3])
 
-    if rects1.ndim == 1:
-        x1 = max(rects1[0], rects2[0])
-        y1 = max(rects1[1], rects2[1])
-        x2 = min(rects1[0] + rects1[2], rects2[0] + rects2[2])
-        y2 = min(rects1[1] + rects1[3], rects2[1] + rects2[3])
+    w = np.maximum(x2 - x1, 0)
+    h = np.maximum(y2 - y1, 0)
 
-        w = max(0, x2 - x1)
-        h = max(0, y2 - y1)
+    return np.stack([x1, y1, w, h]).T
 
-        return np.array([x1, y1, w, h])
-    elif rects1.ndim == 2:
-        x1 = np.maximum(rects1[:, 0], rects2[:, 0])
-        y1 = np.maximum(rects1[:, 1], rects2[:, 1])
-        x2 = np.minimum(rects1[:, 0] + rects1[:, 2],
-                        rects2[:, 0] + rects2[:, 2])
-        y2 = np.minimum(rects1[:, 1] + rects1[:, 3],
-                        rects2[:, 1] + rects2[:, 3])
 
-        w = np.maximum(x2 - x1, 0)
-        h = np.maximum(y2 - y1, 0)
+def poly_iou(polys1, polys2):
+    r"""Intersection over union of polygons.
+    """
+    assert polys1.shape == polys2.shape
+    polys1 = _to_poly(polys1)
+    polys2 = _to_poly(polys2)
 
-        return np.stack((x1, y1, w, h), axis=1)
+    ious = []
+    eps = np.finfo(float).eps
+    for poly1, poly2 in zip(polys1, polys2):
+        area_inter = poly1.intersection(poly2).area
+        area_union = poly1.union(poly2).area
+        ious.append(area_inter / (area_union + eps))
+    
+    return np.clip(np.asarray(ious), 0.0, 1.0)
+
+
+def _to_poly(arrays):
+    r"""Convert 4, 6 or 8 dimensional arrays to Polygons
+    """
+    def to_poly(array):
+        if len(array) == 4:
+            return box(array[0], array[1],
+                       array[0] + array[2],
+                       array[1] + array[3])
+        elif len(array) == 6:
+            return LinearRing([(array[2 * i], array[2 * i + 1])
+                               for i in range(3)])
+        elif len(array) == 8:
+            return LineString([(array[2 * i], array[2 * i + 1])
+                               for i in range(4)])
+        else:
+            raise Exception(
+                'Only 4, 6 and 8 dimensional array is supported.')
+    
+    return [to_poly(t) for t in arrays]
