@@ -13,7 +13,7 @@ from . import Tracker
 from ..utils import dict2tuple
 from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
-from ..utils.warp import warp_cv2
+from ..utils.warp import crop_array
 
 
 class BCEWeightedLoss(nn.Module):
@@ -154,8 +154,8 @@ class TrackerSiamFC(Tracker):
         self.avg_color = np.mean(image, axis=(0, 1))
 
         # extract template features
-        crop_z = warp_cv2(image, self.center, self.z_sz,
-                          self.cfg.exemplar_sz, self.avg_color)
+        crop_z = crop_array(image, self.center, self.z_sz,
+                            out_size=self.cfg.exemplar_sz)
         crop_z = torch.from_numpy(crop_z).to(
             self.device).permute(2, 0, 1).unsqueeze(0).float()
         with torch.set_grad_enabled(False):
@@ -169,8 +169,8 @@ class TrackerSiamFC(Tracker):
         scaled_target = self.scale_factors[:, np.newaxis] * self.target_sz
 
         # cross correlation
-        crops_x = [warp_cv2(
-            image, self.center, size, self.cfg.search_sz, self.avg_color)
+        crops_x = [crop_array(
+            image, self.center, size, out_size=self.cfg.search_sz)
             for size in scaled_search_area]
         crops_x = torch.stack([torch.from_numpy(c).to(
             self.device).permute(2, 0, 1).float()
@@ -192,8 +192,8 @@ class TrackerSiamFC(Tracker):
 
         # update the template
         if self.cfg.z_lr > 0:
-            crop_z = warp_cv2(image, self.center, self.z_sz,
-                              self.cfg.exemplar_sz, self.avg_color)
+            crop_z = crop_array(image, self.center, self.z_sz,
+                                out_size=self.cfg.exemplar_sz)
             crop_z = torch.from_numpy(crop_z).to(
                 self.device).permute(2, 0, 1).unsqueeze(0).float()
             with torch.set_grad_enabled(False):
