@@ -131,11 +131,6 @@ class TrackerSiamFC(Tracker):
         self.criterion = BCEWeightedLoss().to(self.device)
 
     def init(self, image, init_rect):
-        if image.ndim == 3:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        else:
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
         # initialize parameters
         self.center = init_rect[:2] + init_rect[2:] / 2
         self.target_sz = init_rect[2:]
@@ -168,17 +163,12 @@ class TrackerSiamFC(Tracker):
             self.z = self.branch(crop_z)
 
     def update(self, image):
-        if image.ndim == 3:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        else:
-            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-
         # update scaled sizes
         scaled_exemplar = self.scale_factors * self.z_sz
         scaled_search_area = self.scale_factors * self.x_sz
         scaled_target = self.scale_factors[:, np.newaxis] * self.target_sz
 
-        # locate target
+        # cross correlation
         crops_x = [warp_cv2(
             image, self.center, size, self.cfg.search_sz, self.avg_color)
             for size in scaled_search_area]
@@ -190,18 +180,17 @@ class TrackerSiamFC(Tracker):
             x = self.branch(crops_x)
         score, scale_id = self._calc_score(self.z, x)
 
+        # locate target
+        self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
+            self.cfg.scale_lr * scaled_exemplar[scale_id]
         self.x_sz = (1 - self.cfg.scale_lr) * self.x_sz + \
             self.cfg.scale_lr * scaled_search_area[scale_id]
         self.x_sz = np.clip(self.x_sz, self.min_x_sz, self.max_x_sz)
-        self.center = self._locate_target(self.center, score, self.final_score_sz,
-                                          self.total_stride, self.cfg.search_sz,
-                                          self.cfg.response_up, self.x_sz)
+        self.center = self._locate_target(score, self.center, self.x_sz)
         self.target_sz = (1 - self.cfg.scale_lr) * self.target_sz + \
             self.cfg.scale_lr * scaled_target[scale_id]
 
         # update the template
-        # self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
-        #     self.cfg.scale_lr * scaled_exemplar[scale_id]
         if self.cfg.z_lr > 0:
             crop_z = warp_cv2(image, self.center, self.z_sz,
                               self.cfg.exemplar_sz, self.avg_color)
@@ -212,8 +201,6 @@ class TrackerSiamFC(Tracker):
                 new_z = self.branch(crop_z)
             self.z = (1 - self.cfg.z_lr) * self.z + \
                 self.cfg.z_lr * new_z
-        self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
-            self.cfg.scale_lr * scaled_exemplar[scale_id]
 
         bndbox = np.concatenate([
             self.center - self.target_sz / 2, self.target_sz])
@@ -280,14 +267,13 @@ class TrackerSiamFC(Tracker):
 
         return score, scale_id
 
-    def _locate_target(self, center, score, final_score_sz,
-                       total_stride, search_sz, response_up, x_sz):
+    def _locate_target(self, score, center, x_sz):
         pos = np.unravel_index(score.argmax(), score.shape)[::-1]
-        half = (final_score_sz - 1) / 2
+        half = (self.final_score_sz - 1) / 2
 
         disp_in_area = np.asarray(pos) - half
-        disp_in_xcrop = disp_in_area * total_stride / response_up
-        disp_in_frame = disp_in_xcrop * x_sz / search_sz
+        disp_in_xcrop = disp_in_area * self.total_stride / self.cfg.response_up
+        disp_in_frame = disp_in_xcrop * x_sz / self.cfg.search_sz
 
         center = center + disp_in_frame
 
