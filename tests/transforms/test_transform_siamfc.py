@@ -21,7 +21,7 @@ class TestTransformSiamFC(unittest.TestCase):
         pass
 
     def test_transform_siamfc(self):
-        base_dataset = VOT(self.vot_dir, return_rect=True, download=True)
+        base_dataset = VOT(self.vot_dir, anno_type='rect', download=True)
         transform = TransformSiamFC(stats_path=self.stats_path)
         dataset = Pairwise(
             base_dataset, transform=transform, pairs_per_video=1, subset='train')
@@ -55,7 +55,7 @@ class TestTransformSiamFC(unittest.TestCase):
         array -= array.min()
         array /= array.max()
 
-        return array
+        return 255.0 * array
 
 
 if __name__ == '__main__':

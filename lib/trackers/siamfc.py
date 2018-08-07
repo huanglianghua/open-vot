@@ -6,14 +6,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-import cv2
+import time
+import torchvision.transforms.functional as TF
+import numbers
 from torch.optim.lr_scheduler import StepLR
+from PIL import Image
 
-from . import Tracker
 from ..utils import dict2tuple
 from ..models import SiameseNet, AlexNetV1, AlexNetV2
 from ..utils.ioutil import load_siamfc_from_matconvnet
-from ..utils.warp import crop_array
+from ..utils.warp import crop
+from ..utils.viz import show_frame
 
 
 class BCEWeightedLoss(nn.Module):
@@ -26,10 +29,10 @@ class BCEWeightedLoss(nn.Module):
             input, target, weight, size_average=True)
 
 
-class TrackerSiamFC(Tracker):
+class TrackerSiamFC(object):
 
-    def __init__(self, branch='alexv1', net_path=None, **kargs):
-        super(TrackerSiamFC, self).__init__('SiamFC')
+    def __init__(self, branch='alexv2', net_path=None, **kargs):
+        self.name = 'SiamFC'
         self.parse_args(**kargs)
         self.cuda = torch.cuda.is_available()
         self.device = torch.device('cuda:0' if self.cuda else 'cpu')
@@ -37,24 +40,24 @@ class TrackerSiamFC(Tracker):
         self.setup_optimizer()
 
     def parse_args(self, **kargs):
-        # default branch is AlexNetV1
+        # default branch is AlexNetV2
         self.cfg = {
             'exemplar_sz': 127,
             'search_sz': 255,
-            'response_up': 16,
+            'response_up': 8,
             'context': 0.5,
-            'window_influence': 0.176,
-            'z_lr': 0,
+            'window_influence': 0.25,
+            'z_lr': 0.01,
             'scale_num': 3,
-            'scale_step': 1.0375,
+            'scale_step': 1.0816,
             'scale_penalty': 0.97,
             'scale_lr': 0.59,
-            'r_pos': 16,
+            'r_pos': 8,
             'r_neg': 0,
             'initial_lr': 1e-2,
             'final_lr': 1e-5,
-            'step_size': 2,
-            'epoch_num': 50,
+            'step_size': 50,
+            'epoch_num': 1000,
             'lr_mult_conv_weight': 1,
             'lr_mult_conv_bias': 2,
             'lr_mult_bn_weight': 2,
@@ -62,13 +65,13 @@ class TrackerSiamFC(Tracker):
             'lr_mult_linear_weight': 0,
             'lr_mult_linear_bias': 1,
             'weight_decay': 5e-4,
-            'batch_size': 8}
+            'batch_size': 32}
 
         for key, val in kargs.items():
             self.cfg.update({key: val})
         self.cfg = dict2tuple(self.cfg)
 
-    def setup_model(self, branch='alexv1', net_path=None):
+    def setup_model(self, branch='alexv2', net_path=None):
         assert branch in ['alexv1', 'alexv2']
         if branch == 'alexv1':
             self.model = SiameseNet(AlexNetV1(), norm='linear')
@@ -79,7 +82,7 @@ class TrackerSiamFC(Tracker):
             ext = os.path.splitext(net_path)[1]
             if ext == '.mat':
                 load_siamfc_from_matconvnet(net_path, self.model)
-            elif ext == '.pth':
+            elif ext == '.pt':
                 state_dict = torch.load(
                     net_path, map_location=lambda storage, loc: storage)
                 self.model.load_state_dict(state_dict)
@@ -87,7 +90,6 @@ class TrackerSiamFC(Tracker):
                 raise Exception('unsupport file extension')
 
         self.branch = nn.DataParallel(self.model.branch).to(self.device)
-        self.norm = nn.DataParallel(self.model.norm).to(self.device)
         self.model = nn.DataParallel(self.model).to(self.device)
 
     def setup_optimizer(self):
@@ -126,8 +128,7 @@ class TrackerSiamFC(Tracker):
             weight_decay=self.cfg.weight_decay)
         gamma = (self.cfg.final_lr / self.cfg.initial_lr) ** \
             (1 / (self.cfg.epoch_num // self.cfg.step_size))
-        self.scheduler = StepLR(
-            self.optimizer, self.cfg.step_size, gamma=gamma)
+        self.scheduler = StepLR(self.optimizer, self.cfg.step_size, gamma=gamma)
         self.criterion = BCEWeightedLoss().to(self.device)
 
     def init(self, image, init_rect):
@@ -137,30 +138,23 @@ class TrackerSiamFC(Tracker):
         context = self.cfg.context * self.target_sz.sum()
         self.z_sz = np.sqrt((self.target_sz + context).prod())
         self.x_sz = self.z_sz * self.cfg.search_sz / self.cfg.exemplar_sz
-        self.min_x_sz = 0.2 * self.x_sz
-        self.max_x_sz = 5.0 * self.x_sz
 
         self.scale_factors = self.cfg.scale_step ** np.linspace(
-            -self.cfg.scale_num // 2,
+            -(self.cfg.scale_num // 2),
             self.cfg.scale_num // 2, self.cfg.scale_num)
         self.score_sz, self.total_stride = self._deduce_network_params(
             self.cfg.exemplar_sz, self.cfg.search_sz)
         self.final_score_sz = self.cfg.response_up * (self.score_sz - 1) + 1
 
-        self.penalty = np.outer(
-            np.hanning(self.final_score_sz),
-            np.hanning(self.final_score_sz))
-        self.penalty /= self.penalty.sum()
-        self.avg_color = np.mean(image, axis=(0, 1))
+        hann_1d = np.expand_dims(np.hanning(
+            self.final_score_sz), axis=0)
+        self.penalty = np.transpose(hann_1d) * hann_1d
+        self.penalty = self.penalty / self.penalty.sum()
 
         # extract template features
-        crop_z = crop_array(image, self.center, self.z_sz,
-                            out_size=self.cfg.exemplar_sz)
-        crop_z = torch.from_numpy(crop_z).to(
-            self.device).permute(2, 0, 1).unsqueeze(0).float()
-        with torch.set_grad_enabled(False):
-            self.branch.eval()
-            self.z = self.branch(crop_z)
+        crop_z = crop(image, self.center, self.z_sz,
+                      out_size=self.cfg.exemplar_sz)
+        self.z = self._extract_feature(crop_z)
 
     def update(self, image):
         # update scaled sizes
@@ -168,44 +162,58 @@ class TrackerSiamFC(Tracker):
         scaled_search_area = self.scale_factors * self.x_sz
         scaled_target = self.scale_factors[:, np.newaxis] * self.target_sz
 
-        # cross correlation
-        crops_x = [crop_array(
-            image, self.center, size, out_size=self.cfg.search_sz)
-            for size in scaled_search_area]
-        crops_x = torch.stack([torch.from_numpy(c).to(
-            self.device).permute(2, 0, 1).float()
-            for c in crops_x], dim=0)
-        with torch.set_grad_enabled(False):
-            self.branch.eval()
-            x = self.branch(crops_x)
+        # locate target
+        crops_x = self._crop(image, self.center, scaled_search_area,
+                             out_size=self.cfg.search_sz)
+        x = self._extract_feature(crops_x)
         score, scale_id = self._calc_score(self.z, x)
 
-        # locate target
-        self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
-            self.cfg.scale_lr * scaled_exemplar[scale_id]
         self.x_sz = (1 - self.cfg.scale_lr) * self.x_sz + \
             self.cfg.scale_lr * scaled_search_area[scale_id]
-        self.x_sz = np.clip(self.x_sz, self.min_x_sz, self.max_x_sz)
-        self.center = self._locate_target(score, self.center, self.x_sz)
+        self.center = self._locate_target(self.center, score, self.final_score_sz,
+                                          self.total_stride, self.cfg.search_sz,
+                                          self.cfg.response_up, self.x_sz)
         self.target_sz = (1 - self.cfg.scale_lr) * self.target_sz + \
             self.cfg.scale_lr * scaled_target[scale_id]
 
         # update the template
+        # self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
+        #     self.cfg.scale_lr * scaled_exemplar[scale_id]
         if self.cfg.z_lr > 0:
-            crop_z = crop_array(image, self.center, self.z_sz,
-                                out_size=self.cfg.exemplar_sz)
-            crop_z = torch.from_numpy(crop_z).to(
-                self.device).permute(2, 0, 1).unsqueeze(0).float()
-            with torch.set_grad_enabled(False):
-                self.branch.eval()
-                new_z = self.branch(crop_z)
+            crop_z = crop(image, self.center, self.z_sz,
+                          out_size=self.cfg.exemplar_sz)
+            new_z = self._extract_feature(crop_z)
             self.z = (1 - self.cfg.z_lr) * self.z + \
                 self.cfg.z_lr * new_z
+        self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
+            self.cfg.scale_lr * scaled_exemplar[scale_id]
 
-        bndbox = np.concatenate([
+        return np.concatenate([
             self.center - self.target_sz / 2, self.target_sz])
 
-        return bndbox
+    def track(self, img_files, init_rect, visualize=False):
+        frame_num = len(img_files)
+        bndboxes = np.zeros((frame_num, 4))
+        bndboxes[0, :] = init_rect
+        speed_fps = np.zeros(frame_num)
+
+        for f, img_file in enumerate(img_files):
+            image = Image.open(img_file)
+            if image.mode == 'L':
+                image = image.convert('RGB')
+
+            start_time = time.time()
+            if f == 0:
+                self.init(image, init_rect)
+            else:
+                bndboxes[f, :] = self.update(image)
+            elapsed_time = time.time() - start_time
+            speed_fps[f] = elapsed_time
+
+            if visualize:
+                show_frame(image, bndboxes[f, :], fig_n=1)
+
+        return bndboxes, speed_fps
 
     def step(self, batch, backward=True, update_lr=False):
         if backward:
@@ -229,6 +237,34 @@ class TrackerSiamFC(Tracker):
 
         return loss.item()
 
+    def _crop(self, image, center, sizes, padding='avg', out_size=None):
+        sizes = np.array(sizes)
+        if sizes.ndim == 1:
+            sizes = np.tile(sizes, (2, 1)).T
+
+        max_size = np.max(sizes, axis=0)
+        anchor_patch = crop(image, center, max_size, padding=padding)
+
+        patches = []
+        for i, size in enumerate(sizes):
+            if np.all(size == max_size):
+                patch = anchor_patch
+            else:
+                offset = (max_size - size) / 2
+                patch = anchor_patch.crop((
+                    int(offset[0]),
+                    int(offset[1]),
+                    int(offset[0] + round(size[0])),
+                    int(offset[1] + round(size[1]))))
+            if out_size is not None:
+                patch = patch.resize((out_size, out_size), Image.BILINEAR)
+            patches.append(patch)
+
+        if len(sizes) == 1:
+            patches = patches[0]
+
+        return patches
+
     def _deduce_network_params(self, exemplar_sz, search_sz):
         z = torch.zeros(1, 3, exemplar_sz, exemplar_sz).to(self.device)
         x = torch.zeros(1, 3, search_sz, search_sz).to(self.device)
@@ -246,35 +282,55 @@ class TrackerSiamFC(Tracker):
 
         return score_sz, total_stride
 
+    def _extract_feature(self, image):
+        if isinstance(image, Image.Image):
+            image = (255.0 * TF.to_tensor(image)).unsqueeze(0)
+        elif isinstance(image, (list, tuple)):
+            image = 255.0 * torch.stack([TF.to_tensor(c) for c in image])
+        else:
+            raise Exception('Incorrect input type: {}'.format(type(image)))
+
+        with torch.set_grad_enabled(False):
+            self.branch.eval()
+            return self.branch(image.to(self.device))
+
     def _calc_score(self, z, x):
         scores = F.conv2d(x, z)
         with torch.set_grad_enabled(False):
-            self.norm.eval()
-            scores = self.norm(scores)
+            self.model.module.norm.eval()
+            scores = self.model.module.norm(scores, z, x).squeeze(1)
 
-        scores[:self.cfg.scale_num // 2] *= self.cfg.scale_penalty
-        scores[self.cfg.scale_num // 2 + 1:] *= self.cfg.scale_penalty
-        scale_id = scores.view(self.cfg.scale_num, -1).max(dim=1)[0].argmax()
+        scores = np.stack(
+            [self._resize(s.cpu().numpy(), self.final_score_sz) for s in scores])
+        scores[:self.cfg.scale_num // 2, :, :] *= self.cfg.scale_penalty
+        scores[self.cfg.scale_num // 2 + 1:, :, :] *= self.cfg.scale_penalty
 
-        score = scores[scale_id].squeeze(0).cpu().numpy()
-        score = cv2.resize(
-            score, (self.final_score_sz, self.final_score_sz),
-            interpolation=cv2.INTER_CUBIC)
-        score -= score.min()
-        score /= max(1e-12, score.sum())
+        scale_id = np.argmax(np.amax(scores, axis=(1, 2)))
+        score = scores[scale_id, :, :]
+        score = score - np.min(score)
+        score = score / (np.sum(score) + 1e-12)
         score = (1 - self.cfg.window_influence) * score + \
             self.cfg.window_influence * self.penalty
 
         return score, scale_id
 
-    def _locate_target(self, score, center, x_sz):
-        pos = np.unravel_index(score.argmax(), score.shape)[::-1]
-        half = (self.final_score_sz - 1) / 2
+    def _resize(self, array2d, size):
+        if isinstance(size, numbers.Number):
+            size = (size, size)
+        image = Image.fromarray(array2d)
+        image = image.resize(size, Image.BICUBIC)
 
-        disp_in_area = np.asarray(pos) - half
-        disp_in_xcrop = disp_in_area * self.total_stride / self.cfg.response_up
-        disp_in_frame = disp_in_xcrop * x_sz / self.cfg.search_sz
+        return np.array(image)
 
-        center = center + disp_in_frame
+    def _locate_target(self, center, score, final_score_sz,
+                       total_stride, search_sz, response_up, x_sz):
+        pos = np.asarray(np.unravel_index(score.argmax(), score.shape))
+        half = (final_score_sz - 1) / 2
+
+        disp_in_area = pos - half
+        disp_in_xcrop = disp_in_area * total_stride / response_up
+        disp_in_frame = disp_in_xcrop * x_sz / search_sz
+
+        center = center + disp_in_frame[::-1]
 
         return center

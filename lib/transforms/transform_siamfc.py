@@ -3,6 +3,8 @@ from __future__ import absolute_import, division
 import numpy as np
 import torchvision.transforms.functional as F
 import torch
+import numbers
+from PIL import Image
 
 from ..utils import dict2tuple
 from ..utils.ioutil import load_siamfc_stats
@@ -27,7 +29,13 @@ class TransformSiamFC(object):
             'r_pos': 16,
             'r_neg': 0,
             'total_stride': 8,
-            'ignore_label': -100}
+            'ignore_label': -100,
+            # augmentation parameters
+            'aug_translate': True,
+            'max_translate': 4,
+            'aug_stretch': True,
+            'max_stretch': 0.05,
+            'aug_color': True}
 
         for key, val in default_args.items():
             if key in kargs:
@@ -40,28 +48,15 @@ class TransformSiamFC(object):
         crop_x = self._crop(img_x, bndbox_x, self.search_sz)
         labels, weights = self._create_labels()
 
-        # data augmentation
-        if np.random.rand() > 0.5:
-            crop_z = F.hflip(crop_z)
-            crop_x = F.hflip(crop_x)
+        crop_z = self._acquire_augment(
+            crop_z, self.exemplar_sz, self.stats.rgb_variance_z)
+        crop_x = self._acquire_augment(
+            crop_x, self.search_sz, self.stats.rgb_variance_x)
 
-        crop_z = 255.0 * F.to_tensor(crop_z)
-        crop_x = 255.0 * F.to_tensor(crop_x)
+        crop_z = (255.0 * F.to_tensor(crop_z)).float()
+        crop_x = (255.0 * F.to_tensor(crop_x)).float()
         labels = torch.from_numpy(labels).float()
         weights = torch.from_numpy(weights).float()
-
-        # color augmentation
-        if self.stats:
-            offset_z = np.reshape(np.dot(
-                self.stats.rgb_variance_z,
-                np.random.randn(3, 1)), (3, 1, 1))
-            offset_x = np.reshape(np.dot(
-                self.stats.rgb_variance_x,
-                np.random.randn(3, 1)), (3, 1, 1))
-            crop_z += torch.from_numpy(offset_z).float()
-            crop_x += torch.from_numpy(offset_x).float()
-            crop_z = torch.clamp(crop_z, 0.0, 255.0)
-            crop_x = torch.clamp(crop_x, 0.0, 255.0)
 
         return crop_z, crop_x, labels, weights
 
@@ -108,3 +103,39 @@ class TransformSiamFC(object):
                     labels[r, c] = 0
 
         return labels
+
+    def _acquire_augment(self, patch, out_size, rgb_variance):
+        center = (out_size // 2, out_size // 2)
+        patch_sz = np.asarray(patch.size)
+
+        if self.aug_stretch:
+            scale = (1 + self.max_stretch * (-1 + 2 * np.random.rand(2)))
+            size = np.round(np.minimum(out_size * scale, patch_sz))
+        else:
+            size = patch_sz
+
+        if self.aug_translate:
+            mx, my = np.minimum(
+                self.max_translate, np.floor((patch_sz - size) / 2))
+            rx = np.random.randint(-mx, mx) if mx > 0 else 0
+            ry = np.random.randint(-my, my) if my > 0 else 0
+            dx = center[0] - size[0] // 2 + rx
+            dy = center[1] - size[1] // 2 + ry
+        else:
+            dx = center[0] - size[0] // 2
+            dy = center[1] - size[1] // 2
+
+        patch = patch.crop((
+            int(dx), int(dy),
+            int(dx + round(size[0])),
+            int(dy + round(size[1]))))
+        patch = patch.resize((out_size, out_size), Image.NEAREST)
+
+        if self.aug_color:
+            offset = np.reshape(np.dot(
+                rgb_variance, np.random.randn(3)), (1, 1, 3))
+            out = patch - offset
+        else:
+            out = patch
+
+        return out
