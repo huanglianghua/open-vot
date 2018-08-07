@@ -7,10 +7,11 @@ import io
 import six
 from itertools import chain
 
+from . import VideoObjectDataset
 from ..utils.ioutil import download, extract
 
 
-class OTB(object):
+class OTB(VideoObjectDataset):
 
     __otb13_seqs = ['Basketball', 'Bolt', 'Boy', 'Car4', 'CarDark',
                     'CarScale', 'Coke', 'Couple', 'Crossing', 'David',
@@ -57,8 +58,8 @@ class OTB(object):
         'tb100': __tb100_seqs}
 
     def __init__(self, root_dir, version=2015, download=True):
-        super(OTB, self).__init__()
         assert version in self.__version_dict
+        super(OTB, self).__init__('OTB-{}'.format(version))
 
         self.root_dir = root_dir
         self.version = version

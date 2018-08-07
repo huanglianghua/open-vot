@@ -5,18 +5,19 @@ import glob
 import numpy as np
 import six
 
+from . import VideoObjectDataset
 from ..utils.ioutil import download, extract
 
 
-class VOT(object):
+class VOT(VideoObjectDataset):
 
     __valid_versions = range(2013, 2017 + 1)
 
     def __init__(self, root_dir, version=2017,
                  anno_type='rect', download=True):
-        super(VOT, self).__init__()
-        assert version in self.__valid_versions, 'Unsupport VOT version.'
-        assert anno_type in ['rect', 'corner'], 'Unknown annotation type.'
+        assert version in self.__valid_versions
+        assert anno_type in ['rect', 'corner']
+        super(VOT, self).__init__('vot{}'.format(version))
 
         self.root_dir = root_dir
         self.version = version

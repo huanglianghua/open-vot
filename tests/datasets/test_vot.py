@@ -18,7 +18,7 @@ class TestVOT(unittest.TestCase):
         pass
 
     def test_load(self):
-        dataset = VOT(self.vot_dir, return_rect=True)
+        dataset = VOT(self.vot_dir, anno_type='rect')
         self.assertGreater(len(dataset), 0)
 
         for img_files, anno in dataset:

@@ -9,14 +9,16 @@ import random
 from torch.utils.data import Dataset
 from PIL import Image
 
+from . import VideoObjectDataset
 
-class ImageNetVID(object):
+
+class ImageNetVID(VideoObjectDataset):
 
     def __init__(self, root_dir, return_rect=False,
                  subset='train', rand_choice=True, download=False):
         r'''TODO: make the track_id sampling deterministic
         '''
-        super(ImageNetVID, self).__init__()
+        super(ImageNetVID, self).__init__('ImageNetVID')
         self.root_dir = root_dir
         self.return_rect = return_rect
         self.rand_choice = rand_choice
