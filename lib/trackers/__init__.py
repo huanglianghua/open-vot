@@ -45,7 +45,8 @@ class Tracker(object):
         return bndboxes, speed_fps
 
 
-from .siamfc import TrackerSiamFC
+# from .siamfc import TrackerSiamFC
+from .siamfc_tf import TrackerSiamFC
 from .goturn import TrackerGOTURN
 from .csk import TrackerCSK
 from .kcf import TrackerKCF
