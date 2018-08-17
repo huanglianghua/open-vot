@@ -18,5 +18,5 @@ experiment = ExperimentOTB(otb_dir, version=2013)
 # tracker = TrackerSiamFC(branch=branch, net_path=net_path, **config)
 tracker = TrackerSiamFC()
 
-experiment.run(tracker, visualize=False)
+experiment.run(tracker, visualize=True)
 experiment.report(['SiamFC'])

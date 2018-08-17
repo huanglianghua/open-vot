@@ -16,18 +16,19 @@ class AlexNet(object):
         arg_scope = self.setup_argscope(trainable, is_training)
         with slim.arg_scope(arg_scope):
             return self.inference(inputs, reuse)
-    
+
     def parse_args(self, **kargs):
         self.cfg = {
             'bn_scale': True,
             'bn_momentum': 0.05,
-            'bn_epsilon': 'kaiming_normal',
-            'weight_decay': 5e-4}
-        
+            'bn_epsilon': 1e-6,
+            'weight_decay': 5e-4,
+            'init_method': 'kaiming_normal'}
+
         for key, val in kargs.items():
             self.cfg.update({key: val})
         self.cfg = namedtuple('GenericDict', self.cfg.keys())(**self.cfg)
-    
+
     def setup_argscope(self, trainable=False, is_training=False):
         # batchnorm parameters
         norm_params = {
@@ -36,7 +37,7 @@ class AlexNet(object):
             'epsilon': self.cfg.bn_epsilon,
             'trainable': trainable,
             'is_training': trainable and is_training,
-            'variable_collections': {
+            'variables_collections': {
                 'beta': None,
                 'gamma': None,
                 'moving_mean': ['moving_vars'],
@@ -57,7 +58,7 @@ class AlexNet(object):
                 factor=2.0, mode='FAN_OUT', uniform=False)
         else:
             weights_initializer = slim.xavier_initializer()
-        
+
         # setup argument scope
         with slim.arg_scope(
             # conv2d
@@ -66,7 +67,7 @@ class AlexNet(object):
             weights_initializer=weights_initializer,
             padding='VALID',
             trainable=trainable,
-            avtivation_fn=tf.nn.relu,
+            activation_fn=tf.nn.relu,
             normalizer_fn=norm_fn,
             normalizer_params=norm_params):
             with slim.arg_scope(
@@ -81,7 +82,7 @@ class AlexNet(object):
 
     def inference(self, inputs, reuse=False):
         with tf.variable_scope(
-            'alexnet', 'alexnet', [inputs], reuse=reuse) as sc:
+                'convolutional_alexnet', [inputs], reuse=reuse) as sc:
             end_points_collections = sc.name + '_end_points'
             with slim.arg_scope(
                 [slim.conv2d, slim.max_pool2d],
@@ -133,6 +134,8 @@ class GraphSiamFC(object):
         # graph input: filename, bndbox
         # grapu output: init_op, response
         self.setup_graph()
+        # setup saver for retoring from checkpoints
+        self.setup_saver()
 
     def parse_args(self, **kargs):
         self.cfg = {
@@ -148,17 +151,21 @@ class GraphSiamFC(object):
             'response_up': 8,
             'adjust_scale': 0.001}
 
+        for key, val in kargs.items():
+            self.cfg.update({key: val})
+        self.cfg = namedtuple('GenericDict', self.cfg.keys())(**self.cfg)
+
     def setup_graph(self):
         # placeholders
         filename = tf.placeholder(tf.string, [], name='filename')
         bndbox = tf.placeholder(tf.float32, [4], name='bndbox')
 
         # convert bndbox to 0-indexed and center based [y, x, h, w]
-        bndbox = tf.concat([
+        bndbox = tf.stack([
             bndbox[1] - (bndbox[3] - 1) / 2,
             bndbox[0] - (bndbox[2] - 1) / 2,
-            bndbox[3], bndbox[2]], axis=0)
-        center, target_sz = bndbox[:2]. bndbox[2:]
+            bndbox[3], bndbox[2]])
+        center, target_sz = bndbox[:2], bndbox[2:]
 
         # inputs
         image = tf.image.decode_jpeg(tf.read_file(
@@ -198,15 +205,15 @@ class GraphSiamFC(object):
         exemplar_image = tf.expand_dims(
             search_images[self.cfg.scale_num // 2], axis=0)
         exemplar_image = tf.slice(
-            exemplar_image, [0, begin, begin],
-            [1, self.cfg.exemplar_sz, self.cfg.exemplar_sz])
+            exemplar_image, [0, begin, begin, 0],
+            [-1, self.cfg.exemplar_sz, self.cfg.exemplar_sz, -1])
 
         # template embedding
         net = AlexNet()
-        templates = net(exemplar_image, trainable=self.cfg.trainable,
-                        is_training=False)
-        templates = tf.stack([
-            templates for _ in range(self.cfg.scale_num)])
+        templates, _ = net(exemplar_image, trainable=self.cfg.trainable,
+                           is_training=False)
+        templates = tf.concat([
+            templates for _ in range(self.cfg.scale_num)], axis=0)
         with tf.variable_scope('target_template'):
             with tf.variable_scope('State'):
                 state = tf.get_variable(
@@ -216,12 +223,12 @@ class GraphSiamFC(object):
                     trainable=False)
                 with tf.control_dependencies([templates]):
                     self.init_op = tf.assign(state, templates,
-                    validate_shape=True)
+                                             validate_shape=True)
                 templates = state
 
         # response map
-        search_embeds = net(search_images, trainable=self.cfg.trainable,
-                            is_training=False, reuse=True)
+        search_embeds, _ = net(search_images, trainable=self.cfg.trainable,
+                               is_training=False, reuse=True)
         with tf.variable_scope('detection'):
             def xcorr(x, z):
                 x = tf.expand_dims(x, 0)
@@ -240,47 +247,68 @@ class GraphSiamFC(object):
                 initializer=tf.constant_initializer(0.0, dtype=tf.float32),
                 trainable=False)
             response = self.cfg.adjust_scale * output + bias
-        
+
         # upsample response
         with tf.variable_scope('upsample'):
             response = tf.expand_dims(response, 3)
             response_sz = response.get_shape().as_list()[1:3]
             up_sz = [s * self.cfg.response_up for s in response_sz]
             response_up = tf.image.resize_images(
-                response, up_sz, method='bicubic', align_corners=True)
+                response, up_sz, method=tf.image.ResizeMethod.BICUBIC,
+                align_corners=True)
             self.response_up = tf.squeeze(response_up, [3])
+
+    def setup_saver(self):
+        ema = tf.train.ExponentialMovingAverage(0)
+        variables = ema.variables_to_restore(moving_avg_variables=[])
+
+        # filter out State variables
+        variables = {k: v for k, v in variables.items()
+                     if not 'State' in k}
+        self.saver = tf.train.Saver(variables)
+
+    def load_model(self, sess, checkpoint_path):
+        self.saver.restore(sess, checkpoint_path)
 
     def init(self, sess, img_file, init_rect):
         out = sess.run(self.init_op, feed_dict={
             'filename:0': img_file,
             'bndbox:0': init_rect})
-        
+
         return out
 
     def detect(self, sess, img_file, last_rect):
         response_up = sess.run(self.response_up, feed_dict={
             'filename:0': img_file,
             'bndbox:0': last_rect})
-        
+
         return response_up
 
 
-class TrackerSiamFC(Tracker):
+class TrackerSiamFC(object):
 
-    def __init__(self):
-        super(TrackerSiamFC, self).__init__('SiamFC')
-
+    def __init__(self, net_path=None):
+        # setup graph
         self.tf_graph = tf.Graph()
         with self.tf_graph.as_default():
             self.model = GraphSiamFC()
         self.tf_graph.finalize()
-    
-    def init(self, sess, img_file, init_rect):
+
+        # setup Session
+        sess_config = tf.ConfigProto(
+            gpu_options=tf.GPUOptions(allow_growth=True))
+        self.sess = tf.Session(graph=self.tf_graph, config=sess_config)
+
+        # load checkpoint
+        if net_path is not None:
+            self.model.load_model(self.sess, net_path)
+
+    def init(self, img_file, init_rect):
         self.bndbox = init_rect
-        self.model.init(sess, img_file, init_rect)
-    
-    def update(self, sess, img_file):
-        response = self.model.infer(sess, img_file, self.bndbox)
+        self.model.init(self.sess, img_file, init_rect)
+
+    def update(self, img_file):
+        response = self.model.infer(self.sess, img_file, self.bndbox)
         # TODO: locate target based on the response
 
     def track(self, img_files, init_rect, visualize=False):
@@ -289,19 +317,21 @@ class TrackerSiamFC(Tracker):
         bndboxes[0, :] = init_rect
         speed_fps = np.zeros(frame_num)
 
-        sess_config = tf.ConfigProto(
-            gpu_options=tf.GPUOptions(allow_growth=True))
-        with tf.Session(graph=self.tf_graph, config=sess_config) as sess:
-            for f, img_file in enumerate(img_files):
-                start_time = time.time()
-                if f == 0:
-                    self.init(image, init_rect)
-                else:
-                    bndboxes[f, :] = self.update(image)
-                elapsed_time = time.time() - start_time
-                speed_fps[f] = 1. / elapsed_time
+        for f, img_file in enumerate(img_files):
+            start_time = time.time()
+            if f == 0:
+                self.init(image, init_rect)
+            else:
+                bndboxes[f, :] = self.update(image)
+            elapsed_time = time.time() - start_time
+            speed_fps[f] = 1. / elapsed_time
 
-                if visualize:
-                    show_frame(Image.open(img_file), bndboxes[f], fig_n=1)
+            if visualize:
+                show_frame(Image.open(img_file), bndboxes[f], fig_n=1)
 
         return bndboxes, speed_fps
+
+
+if __name__ == '__main__':
+    tracker = TrackerSiamFC(
+        net_path='../../Logs/SiamFC/track_model_checkpoints/SiamFC-3s-color-pretrained/model.ckpt-0')
