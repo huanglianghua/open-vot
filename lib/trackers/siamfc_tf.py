@@ -167,8 +167,8 @@ class GraphSiamFC(object):
 
         # convert bndbox to 0-indexed and center based [y, x, h, w]
         bndbox = tf.stack([
-            bndbox[1] - (bndbox[3] - 1) / 2,
-            bndbox[0] - (bndbox[2] - 1) / 2,
+            bndbox[1] - 1 + (bndbox[3] - 1) / 2,
+            bndbox[0] - 1 + (bndbox[2] - 1) / 2,
             bndbox[3], bndbox[2]])
         center, target_sz = bndbox[:2], bndbox[2:]
 
@@ -347,6 +347,9 @@ class TrackerSiamFC(Tracker):
         hann_1d = np.expand_dims(np.hanning(self.response_sz), axis=0)
         self.window = np.outer(hann_1d, hann_1d)
         self.window /= self.window.sum()
+        self.scale_penalty = np.ones(self.cfg.scale_num) * self.cfg.scale_penalty
+        self.scale_penalty[self.cfg.scale_num // 2] = 1.0
+        self.initial_target_sz = self.bndbox[2:]
 
     def update(self, img_file):
         response_up, search_scales = self.model.detect(
@@ -355,13 +358,6 @@ class TrackerSiamFC(Tracker):
         best_scale, best_loc = self._find_peak(response_up)
         self.bndbox = self._locate(
             self.bndbox, search_scales, best_scale, best_loc)
-
-        import cv2
-        x = np.transpose(response_up, (1, 2, 0))
-        x -= x.min()
-        x /= x.max()
-        cv2.imshow('window', x)
-        cv2.waitKey(1)
 
         return self.bndbox
 
@@ -372,6 +368,7 @@ class TrackerSiamFC(Tracker):
         speed_fps = np.zeros(frame_num)
 
         for f, img_file in enumerate(img_files):
+            img_file = img_files[0]
             start_time = time.time()
             if f == 0:
                 self.init(img_file, init_rect)
@@ -387,7 +384,7 @@ class TrackerSiamFC(Tracker):
 
     def _find_peak(self, response):
         # find best scale
-        max_responses = np.max(response, axis=(1, 2)) * self.cfg.scale_penalty
+        max_responses = np.max(response, axis=(1, 2)) * self.scale_penalty
         best_scale = np.argmax(max_responses)
 
         # find peak location
@@ -413,7 +410,9 @@ class TrackerSiamFC(Tracker):
         # update scale
         scale = (1 - self.cfg.scale_lr) * 1.0 + \
             self.cfg.scale_lr * self.scale_factors[best_scale]
-        target_sz = bndbox[2:] * scale
+        target_scale = bndbox[2:] * scale / self.initial_target_sz
+        target_scale = np.clip(target_scale, 0.2, 5.0)
+        target_sz = self.initial_target_sz * target_scale
 
         bndbox = np.concatenate([
             center - (target_sz - 1) / 2 + 1, target_sz])
