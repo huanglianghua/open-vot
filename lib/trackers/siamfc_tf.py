@@ -136,10 +136,15 @@ class GraphSiamFC(object):
 
     def __init__(self, **kagrs):
         self.parse_args(**kagrs)
-        # graph input: filename, bndbox
-        # grapu output: init_op, response
-        self.setup_graph()
-        # setup saver for retoring from checkpoints
+        if self.cfg.trainable:
+            # graph input: filenames_z, boxes_z, filenames_x, boxes_x
+            # graph output: loss
+            self.setup_train_graph()
+        else:
+            # graph input: filename, box
+            # graph output: init_op, response
+            self.setup_inference_graph()
+        # setup saver for saving to/restoring from checkpoints
         self.setup_saver()
 
     def parse_args(self, **kargs):
@@ -160,17 +165,81 @@ class GraphSiamFC(object):
             self.cfg.update({key: val})
         self.cfg = namedtuple('GenericDict', self.cfg.keys())(**self.cfg)
 
-    def setup_graph(self):
+    def setup_train_graph(self):
+        # placeholders
+        filenames_z = tf.placeholder(tf.string, [None], name='filenames_z')
+        filenames_x = tf.placeholder(tf.string, [None], name='filenames_x')
+        boxes_z = tf.placeholder(tf.float32, [None, 4], name='boxes_z')
+        boxes_x = tf.placeholder(tf.float32, [None, 4], name='boxes_x')
+
+        # transformations
+        def transform_fn(pairs):
+            pass
+        exemplars, instances = tf.map_fn(
+            transform_fn, (filenames_z, filenamex_x, boxes_z, boxes_x),
+            dtype=(tf.float32, tf.float32))
+
+        # embedding
+        net = AlexNet()
+        exemplar_embeds = net(exemplars, trainable=True, is_training=True)
+        instance_embeds = net(instances, trainable=True, is_training=True)
+
+        # responses
+        with tf.variable_scope('detection'):
+            def xcorr(x, z):
+                x = tf.expand_dims(x, 0)
+                z = tf.expand_dims(z, -1)
+                return tf.nn.conv2d(x, z, strides=[1, 1, 1, 1],
+                                    padding='VALID', name='xcorr')
+
+            output = tf.map_fn(
+                lambda x: xcorr(x[0], x[1]),
+                (search_embeds, templates),
+                dtype=search_embeds.dtype)
+            output = tf.squeeze(output, [1, 4])
+
+            bias = tf.get_variable(
+                'biases', [1], dtype=tf.float32,
+                initializer=tf.constant_initializer(0.0, dtype=tf.float32),
+                trainable=True)
+            response = self.cfg.adjust_scale * output + bias
+
+        # loss
+        labels = self.setup_labels(response.get_shape().as_list()[1:])
+        with tf.name_scope('loss'):
+            loss = tf.nn.sigmoid_cross_entropy_with_logits(
+                logits=response, labels=labels)
+            with tf.name_scope('balance_weights'):
+                pos_num = tf.reduce_sum(tf.to_float(tf.equal(labels[0], 1)))
+                neg_num = tf.reduce_sum(tf.to_float(tf.equal(labels[0], 0)))
+                pos_weight = 0.5 / pos_num
+                neg_weight = 0.5 / neg_num
+                weights = tf.where(
+                    tf.equal(labels, 1),
+                    pos_weight * tf.ones_like(labels),
+                    tf.ones_like(labels))
+                weights = tf.where(
+                    tf.equal(labels, 0),
+                    neg_weight * tf.ones_like(labels),
+                    weights)
+                loss = loss * weights
+            loss = tf.reduce_sum(loss, axis=(1, 2))
+
+            self.batch_loss = tf.reduce_mean(loss, name='batch_loss')
+            tf.losses.add_loss(self.batch_loss)
+            self.total_loss = tf.losses.get_total_loss()
+
+    def setup_inference_graph(self):
         # placeholders
         filename = tf.placeholder(tf.string, [], name='filename')
-        bndbox = tf.placeholder(tf.float32, [4], name='bndbox')
+        box = tf.placeholder(tf.float32, [4], name='box')
 
-        # convert bndbox to 0-indexed and center based [y, x, h, w]
-        bndbox = tf.stack([
-            bndbox[1] - 1 + (bndbox[3] - 1) / 2,
-            bndbox[0] - 1 + (bndbox[2] - 1) / 2,
-            bndbox[3], bndbox[2]])
-        center, target_sz = bndbox[:2], bndbox[2:]
+        # convert box to 0-indexed and center based [y, x, h, w]
+        box = tf.stack([
+            box[1] - 1 + (box[3] - 1) / 2,
+            box[0] - 1 + (box[2] - 1) / 2,
+            box[3], box[2]])
+        center, target_sz = box[:2], box[2:]
 
         # inputs
         image = tf.image.decode_jpeg(tf.read_file(
@@ -284,7 +353,7 @@ class GraphSiamFC(object):
     def init(self, sess, img_file, init_rect):
         out = sess.run(self.init_op, feed_dict={
             'filename:0': img_file,
-            'bndbox:0': init_rect})
+            'box:0': init_rect})
 
         return out
 
@@ -292,7 +361,7 @@ class GraphSiamFC(object):
         response_up, search_scales = sess.run(
             [self.response_up, self.search_scales], feed_dict={
             'filename:0': img_file,
-            'bndbox:0': last_rect})
+            'box:0': last_rect})
 
         return response_up, search_scales
 
@@ -338,7 +407,7 @@ class TrackerSiamFC(Tracker):
         self.cfg = namedtuple('GenericDict', self.cfg.keys())(**self.cfg)
 
     def init(self, img_file, init_rect):
-        self.bndbox = init_rect
+        self.box = init_rect
         self.model.init(self.sess, img_file, init_rect)
 
         # initialize parameters
@@ -349,38 +418,37 @@ class TrackerSiamFC(Tracker):
         self.window /= self.window.sum()
         self.scale_penalty = np.ones(self.cfg.scale_num) * self.cfg.scale_penalty
         self.scale_penalty[self.cfg.scale_num // 2] = 1.0
-        self.initial_target_sz = self.bndbox[2:]
+        self.initial_target_sz = self.box[2:]
 
     def update(self, img_file):
         response_up, search_scales = self.model.detect(
-            self.sess, img_file, self.bndbox)
+            self.sess, img_file, self.box)
 
         best_scale, best_loc = self._find_peak(response_up)
-        self.bndbox = self._locate(
-            self.bndbox, search_scales, best_scale, best_loc)
+        self.box = self._locate(
+            self.box, search_scales, best_scale, best_loc)
 
-        return self.bndbox
+        return self.box
 
     def track(self, img_files, init_rect, visualize=False):
         frame_num = len(img_files)
-        bndboxes = np.zeros((frame_num, 4))
-        bndboxes[0, :] = init_rect
+        boxes = np.zeros((frame_num, 4))
+        boxes[0, :] = init_rect
         speed_fps = np.zeros(frame_num)
 
         for f, img_file in enumerate(img_files):
-            img_file = img_files[0]
             start_time = time.time()
             if f == 0:
                 self.init(img_file, init_rect)
             else:
-                bndboxes[f, :] = self.update(img_file)
+                boxes[f, :] = self.update(img_file)
             elapsed_time = time.time() - start_time
             speed_fps[f] = 1. / elapsed_time
 
             if visualize:
-                show_frame(Image.open(img_file), bndboxes[f], fig_n=1)
+                show_frame(Image.open(img_file), boxes[f], fig_n=1)
 
-        return bndboxes, speed_fps
+        return boxes, speed_fps
 
     def _find_peak(self, response):
         # find best scale
@@ -397,24 +465,25 @@ class TrackerSiamFC(Tracker):
 
         return best_scale, np.array(best_loc, float)
 
-    def _locate(self, bndbox, search_scales, best_scale, best_loc):
+    def _locate(self, box, search_scales, best_scale, best_loc):
         # update center
         disp_in_response = best_loc - (self.response_sz - 1) / 2
         disp_in_area = disp_in_response * self.cfg.total_stride / self.cfg.response_up
         disp_in_frame = disp_in_area / search_scales[best_scale]
 
         # 0-indexed
-        center = (bndbox[:2] - 1) + (bndbox[2:] - 1) / 2
+        center = (box[:2] - 1) + (box[2:] - 1) / 2
         center += disp_in_frame[::-1]
 
         # update scale
         scale = (1 - self.cfg.scale_lr) * 1.0 + \
             self.cfg.scale_lr * self.scale_factors[best_scale]
-        target_scale = bndbox[2:] * scale / self.initial_target_sz
+        target_scale = box[2:] * scale / self.initial_target_sz
         target_scale = np.clip(target_scale, 0.2, 5.0)
         target_sz = self.initial_target_sz * target_scale
 
-        bndbox = np.concatenate([
+        # convert to 1-indexed and left-top based
+        box = np.concatenate([
             center - (target_sz - 1) / 2 + 1, target_sz])
 
-        return bndbox
+        return box
