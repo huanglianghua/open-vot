@@ -16,7 +16,7 @@ experiment = ExperimentOTB(otb_dir, version=2013)
 
 # net_path = 'pretrained/siamfc/baseline-conv5_e55.mat'
 # tracker = TrackerSiamFC(branch=branch, net_path=net_path, **config)
-tracker = TrackerSiamFC()
+tracker = TrackerSiamFC(net_path='Logs/SiamFC/track_model_checkpoints/SiamFC-3s-color-pretrained/model.ckpt-0')
 
 experiment.run(tracker, visualize=True)
-experiment.report(['SiamFC'])
+# experiment.report(['SiamFC'])

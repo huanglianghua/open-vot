@@ -2,8 +2,13 @@ from __future__ import absolute_import, division
 
 import tensorflow as tf
 import numpy as np
+import time
 from tensorflow.contrib import slim
 from collections import namedtuple
+from PIL import Image
+
+from . import Tracker
+from ..utils.viz import show_frame
 
 
 class AlexNet(object):
@@ -181,15 +186,21 @@ class GraphSiamFC(object):
         # multi-scale searching bounding boxes
         scales = np.arange(self.cfg.scale_num) - self.cfg.scale_num // 2
         assert np.sum(scales) == 0, 'scale_num should be an odd number'
-        scale_factors = self.cfg.scale_step ** scales
+        self.scale_factors = self.cfg.scale_step ** scales
         boxes = []
-        for factor in scale_factors:
+        for factor in self.scale_factors:
             scaled_search_area = factor * x_sz
             image_sz_1 = tf.to_float(image_sz[:2] - 1)
             boxes.append(tf.concat([
                 tf.div(center - (x_sz - 1) / 2, image_sz_1),
                 tf.div(center + (x_sz - 1) / 2, image_sz_1)], axis=0))
         boxes = tf.stack(boxes)
+        # store search scales to facilitate target locating
+        x_scale = tf.div(tf.to_float(x_sz), self.cfg.search_sz)
+        search_scales = []
+        for factor in self.scale_factors:
+            search_scales.append(x_scale / factor)
+        self.search_scales = tf.stack(search_scales)
 
         # multi-scale searching images
         avg_color = tf.reduce_mean(image, axis=(0, 1), name='avg_color')
@@ -278,16 +289,20 @@ class GraphSiamFC(object):
         return out
 
     def detect(self, sess, img_file, last_rect):
-        response_up = sess.run(self.response_up, feed_dict={
+        response_up, search_scales = sess.run(
+            [self.response_up, self.search_scales], feed_dict={
             'filename:0': img_file,
             'bndbox:0': last_rect})
 
-        return response_up
+        return response_up, search_scales
 
 
-class TrackerSiamFC(object):
+class TrackerSiamFC(Tracker):
 
-    def __init__(self, net_path=None):
+    def __init__(self, net_path=None, **kargs):
+        super(TrackerSiamFC, self).__init__('SiamFC')
+        self.parse_args(**kargs)
+
         # setup graph
         self.tf_graph = tf.Graph()
         with self.tf_graph.as_default():
@@ -303,13 +318,52 @@ class TrackerSiamFC(object):
         if net_path is not None:
             self.model.load_model(self.sess, net_path)
 
+    def parse_args(self, **kargs):
+        self.cfg = {
+            'trainable': False,
+            'exemplar_sz': 127,
+            'search_sz': 255,
+            'context': 0.5,
+            'scale_num': 3,
+            'scale_step': 1.0375,
+            'scale_lr': 0.59,
+            'scale_penalty': 0.9745,
+            'window_influence': 0.176,
+            'response_up': 8,
+            'total_stride': 8,
+            'adjust_scale': 0.001}
+
+        for key, val in kargs.items():
+            self.cfg.update({key: val})
+        self.cfg = namedtuple('GenericDict', self.cfg.keys())(**self.cfg)
+
     def init(self, img_file, init_rect):
         self.bndbox = init_rect
         self.model.init(self.sess, img_file, init_rect)
 
+        # initialize parameters
+        self.scale_factors = self.model.scale_factors
+        self.response_sz = self.model.response_up.get_shape().as_list()[1]
+        hann_1d = np.expand_dims(np.hanning(self.response_sz), axis=0)
+        self.window = np.outer(hann_1d, hann_1d)
+        self.window /= self.window.sum()
+
     def update(self, img_file):
-        response = self.model.infer(self.sess, img_file, self.bndbox)
-        # TODO: locate target based on the response
+        response_up, search_scales = self.model.detect(
+            self.sess, img_file, self.bndbox)
+
+        best_scale, best_loc = self._find_peak(response_up)
+        self.bndbox = self._locate(
+            self.bndbox, search_scales, best_scale, best_loc)
+
+        import cv2
+        x = np.transpose(response_up, (1, 2, 0))
+        x -= x.min()
+        x /= x.max()
+        cv2.imshow('window', x)
+        cv2.waitKey(1)
+
+        return self.bndbox
 
     def track(self, img_files, init_rect, visualize=False):
         frame_num = len(img_files)
@@ -320,9 +374,9 @@ class TrackerSiamFC(object):
         for f, img_file in enumerate(img_files):
             start_time = time.time()
             if f == 0:
-                self.init(image, init_rect)
+                self.init(img_file, init_rect)
             else:
-                bndboxes[f, :] = self.update(image)
+                bndboxes[f, :] = self.update(img_file)
             elapsed_time = time.time() - start_time
             speed_fps[f] = 1. / elapsed_time
 
@@ -331,7 +385,37 @@ class TrackerSiamFC(object):
 
         return bndboxes, speed_fps
 
+    def _find_peak(self, response):
+        # find best scale
+        max_responses = np.max(response, axis=(1, 2)) * self.cfg.scale_penalty
+        best_scale = np.argmax(max_responses)
 
-if __name__ == '__main__':
-    tracker = TrackerSiamFC(
-        net_path='../../Logs/SiamFC/track_model_checkpoints/SiamFC-3s-color-pretrained/model.ckpt-0')
+        # find peak location
+        response = response[best_scale]
+        response -= response.min()
+        response /= (response.sum() + 1e-16)
+        response = (1 - self.cfg.window_influence) * response + \
+            self.cfg.window_influence * self.window
+        best_loc = np.unravel_index(response.argmax(), response.shape)
+
+        return best_scale, np.array(best_loc, float)
+
+    def _locate(self, bndbox, search_scales, best_scale, best_loc):
+        # update center
+        disp_in_response = best_loc - (self.response_sz - 1) / 2
+        disp_in_area = disp_in_response * self.cfg.total_stride / self.cfg.response_up
+        disp_in_frame = disp_in_area / search_scales[best_scale]
+
+        # 0-indexed
+        center = (bndbox[:2] - 1) + (bndbox[2:] - 1) / 2
+        center += disp_in_frame[::-1]
+
+        # update scale
+        scale = (1 - self.cfg.scale_lr) * 1.0 + \
+            self.cfg.scale_lr * self.scale_factors[best_scale]
+        target_sz = bndbox[2:] * scale
+
+        bndbox = np.concatenate([
+            center - (target_sz - 1) / 2 + 1, target_sz])
+
+        return bndbox
