@@ -185,8 +185,8 @@ class TrackerSiamFC(object):
             new_z = self._extract_feature(crop_z)
             self.z = (1 - self.cfg.z_lr) * self.z + \
                 self.cfg.z_lr * new_z
-        self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
-            self.cfg.scale_lr * scaled_exemplar[scale_id]
+            self.z_sz = (1 - self.cfg.scale_lr) * self.z_sz + \
+                self.cfg.scale_lr * scaled_exemplar[scale_id]
 
         return np.concatenate([
             self.center - self.target_sz / 2, self.target_sz])
