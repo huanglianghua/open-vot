@@ -134,7 +134,7 @@ class TransformSiamFC(object):
         if self.aug_color:
             offset = np.reshape(np.dot(
                 rgb_variance, np.random.randn(3)), (1, 1, 3))
-            out = patch - offset
+            out = Image.fromarray(np.uint8(patch - offset))
         else:
             out = patch
 
