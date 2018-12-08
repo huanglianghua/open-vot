@@ -15,7 +15,7 @@ class TestManagerSiamFC(unittest.TestCase):
         self.vid_dir = 'data/ILSVRC'
         self.net_path = 'pretrained/siamfc/2016-08-17.net.mat'
         self.stats_path = 'pretrained/siamfc/cfnet_ILSVRC2015.stats.mat'
-        self.trainer = TrainerSiamFC(self.branch, self.cfg_file)
+        self.trainer = TrainerSiamFC(self.branch,  self.net_path, self.cfg_file)
 
     def tearDown(self):
         pass
