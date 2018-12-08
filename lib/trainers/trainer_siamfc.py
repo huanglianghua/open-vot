@@ -9,7 +9,6 @@ from ..trackers import TrackerSiamFC
 from ..utils.logger import Logger
 from ..datasets import VOT, ImageNetVID, Pairwise
 from ..metrics import rect_iou, center_error
-from ..utils import initialize_weights
 from ..transforms import TransformSiamFC
 
 
@@ -30,7 +29,6 @@ class TrainerSiamFC(object):
 
     def train(self, vid_dir, stats_path=None, vot_dir=None):
         tracker = self.tracker
-        initialize_weights(tracker.model)
         transform = TransformSiamFC(stats_path, **self.cfg._asdict())
 
         epoch_num = self.cfg.epoch_num
