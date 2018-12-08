@@ -15,7 +15,7 @@ from ..transforms import TransformSiamFC
 
 class TrainerSiamFC(object):
 
-    def __init__(self, branch='alexv1', cfg_file=None):
+    def __init__(self, branch='alexv1',net_path=None, cfg_file=None):
         cfg = {}
         if cfg_file is not None:
             with open(cfg_file, 'r') as f:
@@ -23,7 +23,7 @@ class TrainerSiamFC(object):
             cfg = cfg[branch]
 
         self.branch = branch
-        self.tracker = TrackerSiamFC(branch=branch, net_path=None, **cfg)
+        self.tracker = TrackerSiamFC(branch=branch, net_path=net_path, **cfg)
         self.cfg = self.tracker.cfg
         self.logger = Logger(log_dir='logs/siamfc')
         self.cuda = torch.cuda.is_available()
