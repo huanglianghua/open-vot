@@ -215,10 +215,8 @@ class TrackerSiamFC(object):
 
         return bndboxes, speed_fps
 
-    def step(self, batch, backward=True, update_lr=False):
+    def step(self, batch, backward=True):
         if backward:
-            if update_lr:
-                self.scheduler.step()
             self.model.train()
         else:
             self.model.eval()
