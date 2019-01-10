@@ -60,9 +60,9 @@ class TrainerSiamFC(object):
         for epoch in range(epoch_num):
             # training loop
             loss_epoch = 0
-
+            tracker.scheduler.step(epoch)
             for it, batch in enumerate(dataloader_train):
-                loss = tracker.step(batch, update_lr=(it == 0))
+                loss = tracker.step(batch)
                 loss_epoch += loss
 
                 # logging
