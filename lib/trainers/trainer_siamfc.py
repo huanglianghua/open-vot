@@ -76,7 +76,6 @@ class TrainerSiamFC(object):
             # logging
             self.logger.add_text('train/epoch_loss', 'Epoch: {}/{} Loss: {:.6f}'.format(
                 epoch + 1, epoch_num, loss_epoch), epoch)
-            self.logger.add_scalar('train/epoch_loss', loss_epoch, epoch)
 
             # validation loop
             loss_val = 0
@@ -90,7 +89,8 @@ class TrainerSiamFC(object):
             # logging
             self.logger.add_text('train/val_epoch_loss', 'Epoch: {}/{} Val. Loss: {:.6f}'.format(
                 epoch + 1, epoch_num, loss_val), epoch)
-            self.logger.add_scalar('train/val_epoch_loss', loss_val, epoch)
+            self.logger.add_scalars('epoch_loss', {'epoch_loss': loss_epoch, 
+                                                   'val_epoch_loss', loss_val}, epoch)
 
             # tracking loop if vot_dir is available
             if vot_dir is not None:
