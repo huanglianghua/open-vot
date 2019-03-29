@@ -9,13 +9,12 @@ from ..trackers import TrackerSiamFC
 from ..utils.logger import Logger
 from ..datasets import VOT, ImageNetVID, Pairwise
 from ..metrics import rect_iou, center_error
-from ..utils import initialize_weights
 from ..transforms import TransformSiamFC
 
 
 class TrainerSiamFC(object):
 
-    def __init__(self, branch='alexv1', cfg_file=None):
+    def __init__(self, branch='alexv1',net_path=None, cfg_file=None):
         cfg = {}
         if cfg_file is not None:
             with open(cfg_file, 'r') as f:
@@ -23,14 +22,13 @@ class TrainerSiamFC(object):
             cfg = cfg[branch]
 
         self.branch = branch
-        self.tracker = TrackerSiamFC(branch=branch, net_path=None, **cfg)
+        self.tracker = TrackerSiamFC(branch=branch, net_path=net_path, **cfg)
         self.cfg = self.tracker.cfg
         self.logger = Logger(log_dir='logs/siamfc')
         self.cuda = torch.cuda.is_available()
 
     def train(self, vid_dir, stats_path=None, vot_dir=None):
         tracker = self.tracker
-        initialize_weights(tracker.model)
         transform = TransformSiamFC(stats_path, **self.cfg._asdict())
 
         epoch_num = self.cfg.epoch_num
