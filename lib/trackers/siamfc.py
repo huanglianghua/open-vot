@@ -208,7 +208,7 @@ class TrackerSiamFC(object):
             else:
                 bndboxes[f, :] = self.update(image)
             elapsed_time = time.time() - start_time
-            speed_fps[f] = elapsed_time
+            speed_fps[f] = 1.0/elapsed_time
 
             if visualize:
                 show_frame(image, bndboxes[f, :], fig_n=1)
